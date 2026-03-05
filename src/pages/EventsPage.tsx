@@ -384,9 +384,10 @@ const pageStyles = `
 // ── Component ─────────────────────────────────────────────
 interface EventsPageProps {
   onLogout: () => void;
+  onSelectEvent: (event: EventDtoo) => void;
 }
 
-const EventsPage = ({ onLogout }: EventsPageProps) => {
+const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
   const [events, setEvents] = useState<EventDtoo[]>([]);
   const [eventTypes, setEventTypes] = useState<EventTypeDtoo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -536,6 +537,7 @@ const EventsPage = ({ onLogout }: EventsPageProps) => {
                       className="event-card"
                       key={event.eventID}
                       style={{ animationDelay: `${i * 0.08}s` }}
+                      onClick={() => onSelectEvent(event)}
                     >
                       <div className="card-type-badge">
                         {getTypeName(event.eventTypeID)}
