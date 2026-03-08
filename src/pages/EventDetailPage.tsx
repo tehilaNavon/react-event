@@ -315,7 +315,6 @@ export interface CategoryBudget {
   categoryID: number;
   categoryName: string;
   pct: number;
-  stars: number;
 }
 
 interface Props {
@@ -335,8 +334,7 @@ const EventDetailPage = ({ event, onBack, onProceedToVendors }: Props) => {
         data.map((c) => ({
           categoryID: c.categoryID,
           categoryName: c.categoryName,
-          pct: 10,
-          stars: 3,
+          pct: 0,
         }))
       );
     }).catch(console.error)
@@ -429,7 +427,7 @@ const EventDetailPage = ({ event, onBack, onProceedToVendors }: Props) => {
                     <input
                       type="range"
                       className="budget-slider"
-                      min={0} max={60} step={1}
+                      min={0} max={100} step={1}
                       value={b.pct}
                       onChange={(e) => setPct(b.categoryID, Number(e.target.value))}
                     />
@@ -438,15 +436,7 @@ const EventDetailPage = ({ event, onBack, onProceedToVendors }: Props) => {
                   <div className="category-amount">
                     סכום: <span>₪{getAmount(b.pct)}</span>
                   </div>
-                  <div className="stars-row">
-                    {[1,2,3,4,5].map((s) => (
-                      <span
-                        key={s}
-                        className={`star ${s <= b.stars ? "active" : ""}`}
-                        onClick={() => setStars(b.categoryID, s)}
-                      >★</span>
-                    ))}
-                  </div>
+                
                 </div>
               ))}
             </div>
