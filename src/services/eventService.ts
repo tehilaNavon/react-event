@@ -23,6 +23,12 @@ export const getEvents = async (): Promise<EventDtoo[]> => {
   return res.json();
 };
 
+export const getEventById = async (id: number): Promise<EventDtoo> => {
+  const res = await authFetch(`/Event/${id}`);
+  if (!res.ok) throw new Error("Failed to fetch event");
+  return res.json();
+};
+
 export const createEvent = async (
   event: EventCreateDto,
 ): Promise<EventDtoo> => {

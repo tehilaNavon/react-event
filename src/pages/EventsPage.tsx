@@ -1,6 +1,6 @@
 // src/pages/EventsPage.tsx
 import  { useEffect, useState } from "react";
-import { getEvents, createEvent, deleteEvent, getEventTypes } from "../services/eventService";
+import { getEvents, createEvent, deleteEvent, getEventTypes,getEventById  } from "../services/eventService";
 import { type EventDtoo, type EventCreateDto, type EventTypeDtoo } from "../types/event";
 import { getToken } from "../services/authService";
 import { GOLD, GOLD_LIGHT, GOLD_DARK, BLACK, CARD, WHITE, GRAY } from "../styles/theme";
@@ -537,7 +537,10 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                       className="event-card"
                       key={event.eventID}
                       style={{ animationDelay: `${i * 0.08}s` }}
-                      onClick={() => onSelectEvent(event)}
+                      onClick={async () => {
+                      const full = await getEventById(event.eventID);
+                      onSelectEvent(full);
+                    }}
                     >
                       <div className="card-type-badge">
                         {getTypeName(event.eventTypeID)}
