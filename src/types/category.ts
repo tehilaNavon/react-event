@@ -1,5 +1,11 @@
 export interface category {
   categoryID: number;
   categoryName: string;
-pct: number;
+  pct: number;
+}
+
+export interface categoryDtoo {
+  categoryID: number;
+  categoryName: string;
+  pct: number;
 }

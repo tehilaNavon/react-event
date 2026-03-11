@@ -126,6 +126,7 @@ import VendorsPage from "./pages/VendorsPage";
 import TasksPage from "./pages/TasksPage";
 import { isAuthenticated, logoutUser } from "./services/authService";
 import { type EventDtoo } from "./types/event";
+import type { BudgetItem } from "./types/budgetItem";
 
 type Tab = "login" | "register";
 type Page = "events" | "detail" | "vendors" | "tasks";
@@ -135,7 +136,10 @@ interface SuccessState {
   email: string;
 }
 
-interface SelectedVendor { id: number; name: string; }
+interface SelectedVendor {
+  id: number;
+  name: string;
+}
 
 const App: React.FC = () => {
   // ── Auth state (זהה למקור) ──
@@ -146,8 +150,10 @@ const App: React.FC = () => {
   // ── Navigation state (חדש) ──
   const [page, setPage] = useState<Page>("events");
   const [selectedEvent, setSelectedEvent] = useState<EventDtoo | null>(null);
-  const [budgets, setBudgets] = useState<category[]>([]);
-  const [selectedVendors, setSelectedVendors] = useState<Record<number, SelectedVendor>>({});
+  const [budgets, setBudgets] = useState<BudgetItem[]>([]);
+  const [selectedVendors, setSelectedVendors] = useState<
+    Record<number, SelectedVendor>
+  >({});
 
   // ── Auth handlers (זהים למקור) ──
   const handleSuccess = (email: string) => {
@@ -185,23 +191,35 @@ const App: React.FC = () => {
             ) : (
               <>
                 <Logo />
-                <div style={{ display:"flex", marginBottom:36, borderBottom:"1px solid rgba(201,168,76,0.2)" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    marginBottom: 36,
+                    borderBottom: "1px solid rgba(201,168,76,0.2)",
+                  }}
+                >
                   {(["login", "register"] as Tab[]).map((t) => (
                     <button
                       key={t}
                       onClick={() => setTab(t)}
                       style={{
-                        flex:1, padding:"12px 8px 14px",
-                        background:"none", border:"none",
-                        borderBottom: tab === t ? `2px solid ${GOLD}` : "2px solid transparent",
-                        marginBottom:-1,
-                        fontFamily:"'Montserrat', sans-serif",
-                        fontSize:11, letterSpacing:3,
-                        textTransform:"uppercase" as const,
-                        cursor:"pointer",
+                        flex: 1,
+                        padding: "12px 8px 14px",
+                        background: "none",
+                        border: "none",
+                        borderBottom:
+                          tab === t
+                            ? `2px solid ${GOLD}`
+                            : "2px solid transparent",
+                        marginBottom: -1,
+                        fontFamily: "'Montserrat', sans-serif",
+                        fontSize: 11,
+                        letterSpacing: 3,
+                        textTransform: "uppercase" as const,
+                        cursor: "pointer",
                         color: tab === t ? GOLD : "#888",
-                        transition:"color 0.3s, border-color 0.3s",
-                        WebkitTapHighlightColor:"transparent",
+                        transition: "color 0.3s, border-color 0.3s",
+                        WebkitTapHighlightColor: "transparent",
                       }}
                     >
                       {t === "login" ? "Sign In" : "Register"}
@@ -209,9 +227,15 @@ const App: React.FC = () => {
                   ))}
                 </div>
                 {tab === "login" ? (
-                  <LoginPage onSuccess={handleSuccess} onGoRegister={() => setTab("register")} />
+                  <LoginPage
+                    onSuccess={handleSuccess}
+                    onGoRegister={() => setTab("register")}
+                  />
                 ) : (
-                  <RegisterPage onSuccess={handleSuccess} onGoLogin={() => setTab("login")} />
+                  <RegisterPage
+                    onSuccess={handleSuccess}
+                    onGoLogin={() => setTab("login")}
+                  />
                 )}
               </>
             )}
@@ -232,35 +256,48 @@ const App: React.FC = () => {
   //   );
   // }
   // אחרי:
-if (page === "detail" && selectedEvent) {
-  return (
-    <EventDetailPage
-      event={selectedEvent}
-      onBack={() => setPage("events")}
-      onProceedToVendors={(b) => { setBudgets(b); setPage("vendors"); }}
-      onEventUpdate={(updatedBudgets) => {
-        setSelectedEvent(prev => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            budgetItems: prev.budgetItems?.map(item => {
-              const updated = updatedBudgets.find(b => b.categoryID === item.categoryID);
-              return updated ? { ...item, plannedAmount: updated.currentAmount } : item;
-            })
-          };
-        });
-      }}
-    />
-  );
-}
+  if (page === "detail" && selectedEvent) {
+    return (
+      <EventDetailPage
+        event={selectedEvent}
+        onBack={() => setPage("events")}
+      
+        onProceedToVendors={(b) => {
+          setBudgets(b);
+          setPage("vendors");
+        }}
+        onEventUpdate={(updatedBudgets) => {
+          setSelectedEvent((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              budgetItems: prev.budgetItems?.map((item) => {
+                const updated = updatedBudgets.find(
+                  (b) => b.categoryID === item.categoryID,
+                );
+                return updated
+                  ? { ...item, plannedAmount: updated.currentAmount }
+                  : item;
+              }),
+            };
+          });
+        }}
+      />
+    );
+  }
 
   if (page === "vendors" && selectedEvent) {
     return (
       <VendorsPage
         event={selectedEvent}
         budgets={budgets}
+        initialSelected={selectedVendors} // ← הוסף
+        onSaveSelected={(v) => setSelectedVendors(v)}  // ← הוסף
         onBack={() => setPage("detail")}
-        onProceedToTasks={(v) => { setSelectedVendors(v); setPage("tasks"); }}
+        onProceedToTasks={(v) => {
+          setSelectedVendors(v);
+          setPage("tasks");
+        }}
       />
     );
   }
@@ -271,7 +308,10 @@ if (page === "detail" && selectedEvent) {
         event={selectedEvent}
         selectedVendors={selectedVendors}
         onBack={() => setPage("vendors")}
-        onFinish={() => { setPage("events"); setSelectedEvent(null); }}
+        onFinish={() => {
+          setPage("events");
+          setSelectedEvent(null);
+        }}
       />
     );
   }
@@ -279,7 +319,12 @@ if (page === "detail" && selectedEvent) {
   return (
     <EventsPage
       onLogout={handleLogout}
-      onSelectEvent={(event) => { setSelectedEvent(event); setPage("detail"); }}
+      onSelectEvent={(event) => {
+        setSelectedEvent(event);
+          setSelectedVendors({});  // ← איפוס בחירות
+
+        setPage("detail");
+      }}
     />
   );
 };
