@@ -14,6 +14,18 @@ export interface BudgetItem {
 }
 
 
+export interface BudgetItemPayload {
+  budgetItemID: number;
+  eventID: number;
+  categoryID: number;
+  plannedAmount: number;
+  actualAmount: number;
+  isIgnore: boolean;
+  isLocked: boolean;
+  vendorID: number | null;
+}
+
+
 //   export interface BudgetItemSmallCase {
 // budgetItemID   :number;
 //      eventID:number;

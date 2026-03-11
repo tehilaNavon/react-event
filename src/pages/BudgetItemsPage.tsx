@@ -1,8 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import React from "react";
 import { type EventDtoo } from "../types/event";
-import { authFetch } from "../services/authService";
 import { pageStyles } from "../styles/BudgetItemsStyle";
+import {
+  fetchCategoryPriceRange,
+  buildBudgetPayload,
+  saveAllBudgetItems,
+} from "../services/BudgetItemService";
 
 export interface CategoryBudget {
   categoryID: number;
@@ -52,6 +56,7 @@ const EventDetailPage = ({
   const [confirmIgnoreId, setConfirmIgnoreId] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
   useEffect(() => {
     setBudgets(initialData);
   }, [event.eventID]);
@@ -64,13 +69,10 @@ const EventDetailPage = ({
       for (const item of items) {
         const categoryID = item.categoryID;
         try {
-          const [minRes, maxRes] = await Promise.all([
-            authFetch(`/Vendor/minPrice/${categoryID}`).then((r) => r.json()),
-            authFetch(`/Vendor/maxPrice/${categoryID}`).then((r) => r.json()),
-          ]);
-
-          const min = Number(minRes) || 0;
-          const max = Number(maxRes) || item.plannedAmount * 2;
+          const { min, max } = await fetchCategoryPriceRange(
+            categoryID,
+            item.plannedAmount * 2,
+          );
 
           setBudgets((prev) =>
             prev.map((b) =>
@@ -79,10 +81,7 @@ const EventDetailPage = ({
                     ...b,
                     min,
                     max,
-                    currentAmount: Math.min(
-                      Math.max(b.currentAmount, min),
-                      max,
-                    ),
+                    currentAmount: Math.min(Math.max(b.currentAmount, min), max),
                     minLoading: false,
                   }
                 : b,
@@ -112,292 +111,105 @@ const EventDetailPage = ({
       : 0;
 
   // ─── שינוי ידני בסליידר ───────────────────────────────────────────
-  // const setAmount = (id: number, val: number) =>
-  //   setBudgets((p) => p.map((b) => (b.categoryID === id && !b.locked ? { ...b, currentAmount: val } : b)));
+  const setAmount = (id: number, newVal: number) => {
+    setBudgets((prev) => {
+      const target = prev.find((b) => b.categoryID === id);
+      if (!target || target.locked || target.ignored) return prev;
 
-  //---------------------------------------------------------------------------------------
-  // const setAmount = (id: number, newVal: number) => {
-  //   setBudgets((prev) => {
-  //     const target = prev.find((b) => b.categoryID === id);
-  //     if (!target || target.locked) return prev;
+      const sanitizedNewVal = Math.min(Math.max(newVal, target.min), target.max);
+      if (sanitizedNewVal === target.currentAmount) return prev;
 
-  //     const diff = newVal - target.currentAmount; // ← ההפרש
-  //     if (diff === 0) return prev;
+      const lockedTotal = prev
+        .filter((b) => b.categoryID !== id && (b.locked || b.ignored))
+        .reduce((s, b) => s + (b.ignored ? 0 : b.currentAmount), 0);
 
-  //     const others = prev.filter(
-  //       (b) => b.categoryID !== id && !b.ignored && !b.locked,
-  //     );
-  //     const totalOthers = others.reduce((s, b) => s + b.currentAmount, 0);
+      const neededFromRecipients =
+        event.totalBudget - sanitizedNewVal - lockedTotal;
 
-  //     return prev.map((b) => {
-  //       if (b.categoryID === id) return { ...b, currentAmount: newVal };
+      const allRecipients = prev.filter(
+        (b) => b.categoryID !== id && !b.ignored && !b.locked,
+      );
 
-  //       if (!b.ignored && !b.locked && totalOthers > 0) {
-  //         const share = (b.currentAmount / totalOthers) * diff; // ← יחסי
-  //         const updated = Math.round(b.currentAmount - share);
-  //         return {
-  //           ...b,
-  //           currentAmount: Math.min(Math.max(updated, b.min), b.max),
-  //         };
-  //       }
+      if (allRecipients.length === 0) return prev;
 
-  //       return b;
-  //     });
-  //   });
-  // };
-  //-----------------------------------------------------------------------------------
-  // const setAmount = (id: number, newVal: number) => {
-  //   setBudgets((prev) => {
-  //     const target = prev.find((b) => b.categoryID === id);
-  //     if (!target || target.locked) return prev;
+      const minPossible = allRecipients.reduce((s, b) => s + b.min, 0);
+      const maxPossible = allRecipients.reduce((s, b) => s + b.max, 0);
 
-  //     // 1. הגבלת הערך החדש של הסליידר שהזזנו לטווח המותר שלו
-  //     const sanitizedNewVal = Math.min(
-  //       Math.max(newVal, target.min),
-  //       target.max,
-  //     );
-  //     const diff = sanitizedNewVal - target.currentAmount;
-  //     if (diff === 0) return prev;
+      if (
+        neededFromRecipients < minPossible ||
+        neededFromRecipients > maxPossible
+      ) {
+        return prev;
+      }
 
-  //     let updatedBudgets = [...prev];
+      let amounts = new Map<number, number>(
+        allRecipients.map((b) => [b.categoryID, b.currentAmount]),
+      );
 
-  //     // עדכון הקטגוריה שהשתנתה
-  //     updatedBudgets = updatedBudgets.map((b) =>
-  //       b.categoryID === id ? { ...b, currentAmount: sanitizedNewVal } : b,
-  //     );
+      for (let round = 0; round < allRecipients.length + 1; round++) {
+        const currentSum = [...amounts.values()].reduce((s, v) => s + v, 0);
+        const diff = neededFromRecipients - currentSum;
 
-  //     // 2. הגדרת מי יכול לקבל/לתת תקציב (לא נעול, לא התעלמנו ממנו, ולא הסליידר הנוכחי)
-  //     let recipients = updatedBudgets.filter(
-  //       (b) => b.categoryID !== id && !b.ignored && !b.locked,
-  //     );
+        if (Math.abs(diff) < 1) break;
 
-  //     if (recipients.length === 0) return updatedBudgets;
+        const goingUp = diff > 0;
 
-  //     // 3. חלוקת ההפרש (diff) בצורה איטרטיבית
-  //     let amountToDistribute = diff;
+        const canAdjust = allRecipients.filter((b) => {
+          const cur = amounts.get(b.categoryID)!;
+          return goingUp ? cur < b.max : cur > b.min;
+        });
 
-  //     // אנחנו מנסים לחלק את ההפרש עד שהוא נגמר או שכולם הגיעו לקצה (Limit)
-  //     while (Math.abs(amountToDistribute) > 1) {
-  //       const canAdjust = recipients.filter(
-  //         (b) =>
-  //           amountToDistribute > 0
-  //             ? b.currentAmount > b.min // אם הוספנו לסליידר הראשי, אחרים צריכים לרדת
-  //             : b.currentAmount < b.max, // אם הורדנו, אחרים צריכים לעלות
-  //       );
+        if (canAdjust.length === 0) break;
 
-  //       if (canAdjust.length === 0) break;
+        const totalHeadroom = canAdjust.reduce((s, b) => {
+          const cur = amounts.get(b.categoryID)!;
+          return s + (goingUp ? b.max - cur : cur - b.min);
+        }, 0);
 
-  //       const totalWeight =
-  //         canAdjust.reduce((sum, b) => sum + b.currentAmount, 0) ||
-  //         canAdjust.length;
-  //       let distributedInRound = 0;
+        for (const b of canAdjust) {
+          const cur = amounts.get(b.categoryID)!;
+          const headroom = goingUp ? b.max - cur : cur - b.min;
+          const share =
+            totalHeadroom > 0
+              ? (headroom / totalHeadroom) * diff
+              : diff / canAdjust.length;
 
-  //       const nextState = updatedBudgets.map((b) => {
-  //         const isRecip = canAdjust.find((r) => r.categoryID === b.categoryID);
-  //         if (!isRecip) return b;
+          const newAmount = Math.min(Math.max(cur + share, b.min), b.max);
+          amounts.set(b.categoryID, newAmount);
+        }
+      }
 
-  //         // חישוב החלק היחסי של הקטגוריה בהפחתה/הוספה
-  //         const share = (b.currentAmount / totalWeight) * amountToDistribute;
-  //         const targetAmount = b.currentAmount - share;
+      const finalSum = [...amounts.values()].reduce((s, v) => s + v, 0);
+      const roundingError = neededFromRecipients - finalSum;
 
-  //         // הגבלה לטווח המותר
-  //         const finalAmount = Math.min(Math.max(targetAmount, b.min), b.max);
-  //         const actualChange = b.currentAmount - finalAmount;
+      if (Math.abs(roundingError) >= 1) {
+        const adjustable = allRecipients.find((b) => {
+          const cur = amounts.get(b.categoryID)!;
+          return roundingError > 0 ? cur < b.max : cur > b.min;
+        });
+        if (adjustable) {
+          const cur = amounts.get(adjustable.categoryID)!;
+          amounts.set(
+            adjustable.categoryID,
+            Math.min(
+              Math.max(cur + roundingError, adjustable.min),
+              adjustable.max,
+            ),
+          );
+        }
+      }
 
-  //         distributedInRound += actualChange;
-  //         return { ...b, currentAmount: Math.round(finalAmount) };
-  //       });
-
-  //       updatedBudgets = nextState;
-  //       amountToDistribute -= distributedInRound;
-
-  //       // עדכון רשימת המקבלים לסבב הבא
-  //       recipients = updatedBudgets.filter(
-  //         (b) => b.categoryID !== id && !b.ignored && !b.locked,
-  //       );
-  //     }
-
-  //     return updatedBudgets;
-  //   });
-  // };
-  //---------------
-  // const setAmount = (id: number, newVal: number) => {
-  //   setBudgets((prev) => {
-  //     const target = prev.find((b) => b.categoryID === id);
-  //     if (!target || target.locked || target.ignored) return prev;
-
-  //     const sanitizedNewVal = Math.min(
-  //       Math.max(newVal, target.min),
-  //       target.max,
-  //     );
-  //     if (sanitizedNewVal === target.currentAmount) return prev;
-
-  //     // כמה צריך להיות לכל השאר ביחד כדי לשמור על 100%
-  //     const lockedTotal = prev
-  //       .filter((b) => b.categoryID !== id && (b.locked || b.ignored))
-  //       .reduce((s, b) => s + (b.ignored ? 0 : b.currentAmount), 0);
-
-  //     const targetTotalForRecipients =
-  //       event.totalBudget - sanitizedNewVal - lockedTotal;
-
-  //     const recipients = prev.filter(
-  //       (b) => b.categoryID !== id && !b.ignored && !b.locked,
-  //     );
-
-  //     if (recipients.length === 0) return prev;
-
-  //     // אם הסכום הנדרש שלילי — לא ניתן להוסיף עוד
-  //     if (
-  //       targetTotalForRecipients < recipients.reduce((s, b) => s + b.min, 0)
-  //     ) {
-  //       return prev; // לא ניתן להזיז
-  //     }
-
-  //     // חלוקה יחסית של הסכום הנדרש בין הנמענים
-  //     const currentTotal = recipients.reduce((s, b) => s + b.currentAmount, 0);
-
-  //     let amounts = new Map<number, number>();
-
-  //     if (currentTotal === 0) {
-  //       // חלוקה שווה אם כולם באפס
-  //       const each = targetTotalForRecipients / recipients.length;
-  //       recipients.forEach((b) =>
-  //         amounts.set(b.categoryID, Math.min(Math.max(each, b.min), b.max)),
-  //       );
-  //     } else {
-  //       // חלוקה יחסית לפי גודל נוכחי
-  //       recipients.forEach((b) => {
-  //         const ratio = b.currentAmount / currentTotal;
-  //         const newAmount = targetTotalForRecipients * ratio;
-  //         amounts.set(
-  //           b.categoryID,
-  //           Math.min(Math.max(newAmount, b.min), b.max),
-  //         );
-  //       });
-  //     }
-
-  //     // תיקון שאריות עגול (floating point) — לשמור על סכום מדויק
-  //     const actualSum = [...amounts.values()].reduce((s, v) => s + v, 0);
-  //     const roundingError = targetTotalForRecipients - actualSum;
-  //     if (Math.abs(roundingError) > 0 && recipients.length > 0) {
-  //       const firstId = recipients[0].categoryID;
-  //       amounts.set(firstId, (amounts.get(firstId) ?? 0) + roundingError);
-  //     }
-
-  //     return prev.map((b) => {
-  //       if (b.categoryID === id)
-  //         return { ...b, currentAmount: sanitizedNewVal };
-  //       if (amounts.has(b.categoryID)) {
-  //         return {
-  //           ...b,
-  //           currentAmount: Math.round(amounts.get(b.categoryID)!),
-  //         };
-  //       }
-  //       return b;
-  //     });
-  //   });
-  // };
-  //-------
-const setAmount = (id: number, newVal: number) => {
-  setBudgets((prev) => {
-    const target = prev.find((b) => b.categoryID === id);
-    if (!target || target.locked || target.ignored) return prev;
-
-    // 1. הגבלה קשיחה — הסליידר לעולם לא יצא מהטווח שלו
-    const sanitizedNewVal = Math.min(Math.max(newVal, target.min), target.max);
-    if (sanitizedNewVal === target.currentAmount) return prev;
-
-    const lockedTotal = prev
-      .filter((b) => b.categoryID !== id && (b.locked || b.ignored))
-      .reduce((s, b) => s + (b.ignored ? 0 : b.currentAmount), 0);
-
-    const neededFromRecipients = event.totalBudget - sanitizedNewVal - lockedTotal;
-
-    const allRecipients = prev.filter(
-      (b) => b.categoryID !== id && !b.ignored && !b.locked
-    );
-
-    if (allRecipients.length === 0) return prev;
-
-    // 2. בדיקה שהסכום הנדרש בכלל אפשרי
-    const minPossible = allRecipients.reduce((s, b) => s + b.min, 0);
-    const maxPossible = allRecipients.reduce((s, b) => s + b.max, 0);
-    
-    if (neededFromRecipients < minPossible || neededFromRecipients > maxPossible) {
-      return prev; // בלתי אפשרי — לא מזיזים כלום
-    }
-
-    // 3. חלוקה איטרטיבית לפי headroom
-    let amounts = new Map<number, number>(
-      allRecipients.map((b) => [b.categoryID, b.currentAmount])
-    );
-
-    let remaining = neededFromRecipients;
-
-    for (let round = 0; round < allRecipients.length + 1; round++) {
-      const currentSum = [...amounts.values()].reduce((s, v) => s + v, 0);
-      const diff = remaining - currentSum;
-      
-      if (Math.abs(diff) < 1) break;
-
-      const goingUp = diff > 0;
-
-      const canAdjust = allRecipients.filter((b) => {
-        const cur = amounts.get(b.categoryID)!;
-        return goingUp ? cur < b.max : cur > b.min;
+      return prev.map((b) => {
+        if (b.categoryID === id) return { ...b, currentAmount: sanitizedNewVal };
+        if (amounts.has(b.categoryID)) {
+          return { ...b, currentAmount: Math.round(amounts.get(b.categoryID)!) };
+        }
+        return b;
       });
-
-      if (canAdjust.length === 0) break;
-
-      const totalHeadroom = canAdjust.reduce((s, b) => {
-        const cur = amounts.get(b.categoryID)!;
-        return s + (goingUp ? b.max - cur : cur - b.min);
-      }, 0);
-
-      for (const b of canAdjust) {
-        const cur = amounts.get(b.categoryID)!;
-        const headroom = goingUp ? b.max - cur : cur - b.min;
-        const share = totalHeadroom > 0
-          ? (headroom / totalHeadroom) * diff
-          : diff / canAdjust.length;
-
-        // הגבלה קשיחה — לעולם לא יצא מהטווח
-        const newAmount = Math.min(Math.max(cur + share, b.min), b.max);
-        amounts.set(b.categoryID, newAmount);
-      }
-    }
-
-    // 4. עיגול סופי — גם כאן עם הגבלה קשיחה
-    const finalSum = [...amounts.values()].reduce((s, v) => s + v, 0);
-    const roundingError = neededFromRecipients - finalSum;
-
-    if (Math.abs(roundingError) >= 1) {
-      const adjustable = allRecipients.find((b) => {
-        const cur = amounts.get(b.categoryID)!;
-        return roundingError > 0
-          ? cur < b.max   // צריך להוסיף — יש מקום למעלה
-          : cur > b.min;  // צריך להוריד — יש מקום למטה
-      });
-      if (adjustable) {
-        const cur = amounts.get(adjustable.categoryID)!;
-        // הגבלה קשיחה גם כאן!
-        amounts.set(
-          adjustable.categoryID,
-          Math.min(Math.max(cur + roundingError, adjustable.min), adjustable.max)
-        );
-      }
-    }
-
-    return prev.map((b) => {
-      if (b.categoryID === id) return { ...b, currentAmount: sanitizedNewVal };
-      if (amounts.has(b.categoryID)) {
-        return { ...b, currentAmount: Math.round(amounts.get(b.categoryID)!) };
-      }
-      return b;
     });
-  });
-};
-  // ─── נעילה: הקטגוריה לא תושפע משינויים עתידיים ───────────────────
+  };
+
+  // ─── נעילה ───────────────────────────────────────────────────────
   const toggleLock = (id: number) =>
     setBudgets((p) =>
       p.map((b) => (b.categoryID === id ? { ...b, locked: !b.locked } : b)),
@@ -409,7 +221,6 @@ const setAmount = (id: number, newVal: number) => {
       const target = prev.find((b) => b.categoryID === id);
       if (!target) return prev;
 
-      // סכום לחלוקה = סכום הקטגוריה המבוטלת + כל מה שנותר מהתקציב הכולל
       const currentAllocated = prev
         .filter((b) => !b.ignored)
         .reduce((s, b) => s + b.currentAmount, 0);
@@ -426,7 +237,6 @@ const setAmount = (id: number, newVal: number) => {
         );
       }
 
-      // חלוקה יחסית עם סבבים — מה שלא נקלט (בגלל max) עובר הלאה לשאר
       const amounts = new Map(
         recipients.map((b) => [b.categoryID, b.currentAmount]),
       );
@@ -480,35 +290,37 @@ const setAmount = (id: number, newVal: number) => {
     );
   };
 
-  // const fillPct = (b: CategoryBudget) => {
-  //   const range = b.max - b.min;
-  //   return range <= 0
-  //     ? 0
-  //     : Math.min(100, Math.max(0, ((b.currentAmount - b.min) / range) * 100));
-  // };
-//   const fillPct = (b: CategoryBudget) => {
-//   const range = b.max - b.min;
-//   if (range <= 0) return 0;
-//   const clamped = Math.min(Math.max(b.currentAmount, b.min), b.max);
-//   return Math.min(100, Math.max(0, ((clamped - b.min) / range) * 100));
-//    // זהב מימין, שחור משמאל
-// };
-// const fillPct = (b: CategoryBudget) => {
-//   const range = b.max - b.min;
-//   if (range <= 0) return 0;
-  
-//   const clamped = Math.min(Math.max(b.currentAmount, b.min), b.max);
-  
-//   // חישוב המרחק מהמינימום (שנמצא בשמאל) באחוזים
-//   return ((clamped - b.min) / range) * 100;
-// };
-const fillPct = (b: CategoryBudget) => {
-  const range = b.max - b.min;
-  if (range <= 0) return 0;
-  const clamped = Math.min(Math.max(b.currentAmount, b.min), b.max);
-  const pct = Math.min(100, Math.max(0, ((clamped - b.min) / range) * 100));
-  return 100 - pct; // הפוך כי max בימין
-};
+  const fillPct = (b: CategoryBudget) => {
+    const range = b.max - b.min;
+    if (range <= 0) return 0;
+    const clamped = Math.min(Math.max(b.currentAmount, b.min), b.max);
+    const pct = Math.min(100, Math.max(0, ((clamped - b.min) / range) * 100));
+    return 100 - pct;
+  };
+
+  // ─── שמירה ───────────────────────────────────────────────────────
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const payload =   await buildBudgetPayload(budgets, event);
+      await saveAllBudgetItems(payload);
+
+      const savedBudgets = budgets.map((b) => ({
+        ...b,
+        plannedAmount: b.currentAmount,
+      }));
+
+      setBudgets(savedBudgets);
+      onEventUpdate?.(savedBudgets);
+      onProceedToVendors(savedBudgets.filter((b) => !b.ignored));
+    } catch (err) {
+      console.error("שגיאה בשמירה מרוכזת:", err);
+      setSaveError("שגיאה בשמירת הנתונים, נסה שוב");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <>
@@ -563,7 +375,6 @@ const fillPct = (b: CategoryBudget) => {
           <div className="categories-grid">
             {budgets.map((b, i) => (
               <div
-                // key={`budget-${b.categoryID}-${i}`}
                 key={`ev-${event.eventID}-cat-${b.categoryID}-${i}`}
                 className={`category-card ${b.locked ? "locked" : ""} ${b.ignored ? "ignored" : ""} ${b.selected ? "selected" : ""}`}
                 style={{ animationDelay: `${i * 0.05}s` }}
@@ -571,7 +382,6 @@ const fillPct = (b: CategoryBudget) => {
                 <div className="card-header">
                   <div className="category-name">{b.categoryName}</div>
                   <div className="card-actions">
-                    {/* 🔒 נעילה – הקטגוריה לא תושפע מחלוקות עתידיות */}
                     <button
                       className={`action-btn ${b.locked ? "active-lock" : ""}`}
                       onClick={() => toggleLock(b.categoryID)}
@@ -580,8 +390,6 @@ const fillPct = (b: CategoryBudget) => {
                     >
                       {b.locked ? "🔒" : "🔓"}
                     </button>
-
-                    {/* ✖ התעלמות / ↩ שחזור */}
                     <button
                       className={`action-btn ${b.ignored ? "active-ignore" : ""}`}
                       onClick={() =>
@@ -671,63 +479,14 @@ const fillPct = (b: CategoryBudget) => {
             <button
               className="btn-primary"
               disabled={isSaving}
-              onClick={async () => {
-                setIsSaving(true);
-                setSaveError(null);
-                try {
-                  // 1. הכנת המערך לשליחה - רק עבור פריטים שהשתנו (אופטימיזציה)
-                  const payload = budgets.map((b) => {
-                    const originalItem = event.budgetItems?.find(
-                      (item) => item.categoryID === b.categoryID,
-                    );
-
-                    return {
-                      budgetItemID: originalItem?.budgetItemID || 0,
-                      eventID: event.eventID,
-                      categoryID: b.categoryID,
-                      plannedAmount: b.currentAmount,
-                      actualAmount: originalItem?.actualAmount ?? 0,
-                      isIgnore: b.ignored,
-                      isLocked: b.locked,
-                      vendorID: originalItem?.vendorID || null,
-                    };
-                  });
-
-                  // 2. שליחה אחת מרוכזת לשרת
-                  const response = await authFetch(
-                    `/BudgetItem/UpdateMultiple`,
-                    {
-                      method: "POST", // או PUT, תלוי ב-API שלך
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(payload),
-                    },
-                  );
-
-                  if (!response.ok) throw new Error("Failed to save all items");
-
-                  // 3. עדכון ה-State המקומי ומעבר דף
-                  const savedBudgets = budgets.map((b) => ({
-                    ...b,
-                    plannedAmount: b.currentAmount,
-                  }));
-
-                  setBudgets(savedBudgets);
-                  onEventUpdate?.(savedBudgets);
-                  onProceedToVendors(savedBudgets.filter((b) => !b.ignored));
-                } catch (err) {
-                  console.error("שגיאה בשמירה מרוכזת:", err);
-                  setSaveError("שגיאה בשמירת הנתונים, נסה שוב");
-                } finally {
-                  setIsSaving(false);
-                }
-              }}
+              onClick={handleSave}
             >
               {isSaving ? "שומר..." : "המשך לבחירת ספקים ←"}
             </button>
           </div>
         </main>
       </div>
-      {/* ─── דיאלוג אישור ביטול קטגוריה ─────────────────────────────── */}
+
       {confirmIgnoreId !== null &&
         (() => {
           const cat = budgets.find((b) => b.categoryID === confirmIgnoreId);
