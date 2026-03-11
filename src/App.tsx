@@ -120,7 +120,7 @@ import SuccessScreen from "./components/SuccessScreen";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import EventsPage from "./pages/EventsPage";
-import EventDetailPage from "./pages/EventDetailPage";
+import EventDetailPage from "./pages/BudgetItemsPage";
 import type { category } from "./types/category";
 import VendorsPage from "./pages/VendorsPage";
 import TasksPage from "./pages/TasksPage";
@@ -221,16 +221,38 @@ const App: React.FC = () => {
     );
   }
 
-  // ── מחובר — ניווט בין דפים ──
-  if (page === "detail" && selectedEvent) {
-    return (
-      <EventDetailPage
-        event={selectedEvent}
-        onBack={() => setPage("events")}
-        onProceedToVendors={(b) => { setBudgets(b); setPage("vendors"); }}
-      />
-    );
-  }
+  // // ── מחובר — ניווט בין דפים ──
+  // if (page === "detail" && selectedEvent) {
+  //   return (
+  //     <EventDetailPage
+  //       event={selectedEvent}
+  //       onBack={() => setPage("events")}
+  //       onProceedToVendors={(b) => { setBudgets(b); setPage("vendors"); }}
+  //     />
+  //   );
+  // }
+  // אחרי:
+if (page === "detail" && selectedEvent) {
+  return (
+    <EventDetailPage
+      event={selectedEvent}
+      onBack={() => setPage("events")}
+      onProceedToVendors={(b) => { setBudgets(b); setPage("vendors"); }}
+      onEventUpdate={(updatedBudgets) => {
+        setSelectedEvent(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            budgetItems: prev.budgetItems?.map(item => {
+              const updated = updatedBudgets.find(b => b.categoryID === item.categoryID);
+              return updated ? { ...item, plannedAmount: updated.currentAmount } : item;
+            })
+          };
+        });
+      }}
+    />
+  );
+}
 
   if (page === "vendors" && selectedEvent) {
     return (
