@@ -18,7 +18,7 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ mode, email, onReturn }) 
     </div>
     <div className="success-sub">Your event portal awaits</div>
     <button className="btn" style={{ marginTop: 32 }} onClick={onReturn}>
-      Return
+      כניסה לאירועים
     </button>
   </div>
 );

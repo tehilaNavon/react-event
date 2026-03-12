@@ -7,6 +7,7 @@ import {
   buildBudgetPayload,
   saveAllBudgetItems,
 } from "../services/BudgetItemService";
+import { redistributeBudget } from "../utils/budgetUtils";
 
 export interface CategoryBudget {
   categoryID: number;
@@ -19,10 +20,20 @@ export interface CategoryBudget {
   locked: boolean;
   ignored: boolean;
   selected: boolean;
+  vendorLocked?: boolean;        // ← חדש
+  selectedVendorName?: string; 
 }
 
+// interface Props {
+//   event: EventDtoo;
+//   onBack: () => void;
+//   onProceedToVendors: (budgets: CategoryBudget[]) => void;
+//   onEventUpdate?: (updatedBudgets: CategoryBudget[]) => void;
+// }
+// הוסף ל-Props
 interface Props {
   event: EventDtoo;
+  initialBudgets?: CategoryBudget[];   // ← חדש
   onBack: () => void;
   onProceedToVendors: (budgets: CategoryBudget[]) => void;
   onEventUpdate?: (updatedBudgets: CategoryBudget[]) => void;
@@ -30,12 +41,21 @@ interface Props {
 
 const fmt = (n: number) => Math.round(n).toLocaleString("he-IL");
 
+// const EventDetailPage = ({
+//   event,
+//   onBack,
+//   onProceedToVendors,
+//   onEventUpdate,
+// }: Props) => {
+// שנה את הפונקציה לקבל את initialBudgets
 const EventDetailPage = ({
   event,
+  initialBudgets,   // ← חדש
   onBack,
   onProceedToVendors,
   onEventUpdate,
 }: Props) => {
+
   const initialData = useMemo(() => {
     return (event.budgetItems ?? []).map((item) => ({
       categoryID: item.categoryID,
@@ -52,19 +72,32 @@ const EventDetailPage = ({
     }));
   }, [event.eventID, event.budgetItems]);
 
-  const [budgets, setBudgets] = useState<CategoryBudget[]>(initialData);
+  // const [budgets, setBudgets] = useState<CategoryBudget[]>(initialData);
+ // שנה את ה-useState של budgets:
+const [budgets, setBudgets] = useState<CategoryBudget[]>(
+  initialBudgets && initialBudgets.length > 0 ? initialBudgets : initialData
+);
+
   const [confirmIgnoreId, setConfirmIgnoreId] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // useEffect(() => {
+  //   setBudgets(initialData);
+  // }, [event.eventID]);
+// שנה את ה-useEffect של event.eventID:
+useEffect(() => {
+  if (initialBudgets && initialBudgets.length > 0) {
+    setBudgets(initialBudgets);   // ← שחזור מהשמור
+  } else {
     setBudgets(initialData);
-  }, [event.eventID]);
-
+  }
+}, [event.eventID]);
   useEffect(() => {
     const items = event.budgetItems ?? [];
     if (items.length === 0) return;
-
+    ///// הוספת בדיקה לטעינת טווחים רק אם אין נתונים שמורים
+if (initialBudgets && initialBudgets.length > 0) return;  // אם יש נתונים שמורים, אל תבצע טעינה מחדש
     const fetchData = async () => {
       for (const item of items) {
         const categoryID = item.categoryID;
@@ -81,7 +114,10 @@ const EventDetailPage = ({
                     ...b,
                     min,
                     max,
-                    currentAmount: Math.min(Math.max(b.currentAmount, min), max),
+                    currentAmount: Math.min(
+                      Math.max(b.currentAmount, min),
+                      max,
+                    ),
                     minLoading: false,
                   }
                 : b,
@@ -111,103 +147,114 @@ const EventDetailPage = ({
       : 0;
 
   // ─── שינוי ידני בסליידר ───────────────────────────────────────────
-  const setAmount = (id: number, newVal: number) => {
-    setBudgets((prev) => {
-      const target = prev.find((b) => b.categoryID === id);
-      if (!target || target.locked || target.ignored) return prev;
+  // const setAmount = (id: number, newVal: number) => {
+  //   setBudgets((prev) => {
+  //     const target = prev.find((b) => b.categoryID === id);
+  //     if (!target || target.locked || target.ignored) return prev;
 
-      const sanitizedNewVal = Math.min(Math.max(newVal, target.min), target.max);
-      if (sanitizedNewVal === target.currentAmount) return prev;
+  //     const sanitizedNewVal = Math.min(
+  //       Math.max(newVal, target.min),
+  //       target.max,
+  //     );
+  //     if (sanitizedNewVal === target.currentAmount) return prev;
 
-      const lockedTotal = prev
-        .filter((b) => b.categoryID !== id && (b.locked || b.ignored))
-        .reduce((s, b) => s + (b.ignored ? 0 : b.currentAmount), 0);
+  //     const lockedTotal = prev
+  //       .filter((b) => b.categoryID !== id && (b.locked || b.ignored))
+  //       .reduce((s, b) => s + (b.ignored ? 0 : b.currentAmount), 0);
 
-      const neededFromRecipients =
-        event.totalBudget - sanitizedNewVal - lockedTotal;
+  //     const neededFromRecipients =
+  //       event.totalBudget - sanitizedNewVal - lockedTotal;
 
-      const allRecipients = prev.filter(
-        (b) => b.categoryID !== id && !b.ignored && !b.locked,
-      );
+  //     const allRecipients = prev.filter(
+  //       (b) => b.categoryID !== id && !b.ignored && !b.locked,
+  //     );
 
-      if (allRecipients.length === 0) return prev;
+  //     if (allRecipients.length === 0) return prev;
 
-      const minPossible = allRecipients.reduce((s, b) => s + b.min, 0);
-      const maxPossible = allRecipients.reduce((s, b) => s + b.max, 0);
+  //     const minPossible = allRecipients.reduce((s, b) => s + b.min, 0);
+  //     const maxPossible = allRecipients.reduce((s, b) => s + b.max, 0);
 
-      if (
-        neededFromRecipients < minPossible ||
-        neededFromRecipients > maxPossible
-      ) {
-        return prev;
-      }
+  //     if (
+  //       neededFromRecipients < minPossible ||
+  //       neededFromRecipients > maxPossible
+  //     ) {
+  //       return prev;
+  //     }
 
-      let amounts = new Map<number, number>(
-        allRecipients.map((b) => [b.categoryID, b.currentAmount]),
-      );
+  //     let amounts = new Map<number, number>(
+  //       allRecipients.map((b) => [b.categoryID, b.currentAmount]),
+  //     );
 
-      for (let round = 0; round < allRecipients.length + 1; round++) {
-        const currentSum = [...amounts.values()].reduce((s, v) => s + v, 0);
-        const diff = neededFromRecipients - currentSum;
+  //     for (let round = 0; round < allRecipients.length + 1; round++) {
+  //       const currentSum = [...amounts.values()].reduce((s, v) => s + v, 0);
+  //       const diff = neededFromRecipients - currentSum;
 
-        if (Math.abs(diff) < 1) break;
+  //       if (Math.abs(diff) < 1) break;
 
-        const goingUp = diff > 0;
+  //       const goingUp = diff > 0;
 
-        const canAdjust = allRecipients.filter((b) => {
-          const cur = amounts.get(b.categoryID)!;
-          return goingUp ? cur < b.max : cur > b.min;
-        });
+  //       const canAdjust = allRecipients.filter((b) => {
+  //         const cur = amounts.get(b.categoryID)!;
+  //         return goingUp ? cur < b.max : cur > b.min;
+  //       });
 
-        if (canAdjust.length === 0) break;
+  //       if (canAdjust.length === 0) break;
 
-        const totalHeadroom = canAdjust.reduce((s, b) => {
-          const cur = amounts.get(b.categoryID)!;
-          return s + (goingUp ? b.max - cur : cur - b.min);
-        }, 0);
+  //       const totalHeadroom = canAdjust.reduce((s, b) => {
+  //         const cur = amounts.get(b.categoryID)!;
+  //         return s + (goingUp ? b.max - cur : cur - b.min);
+  //       }, 0);
 
-        for (const b of canAdjust) {
-          const cur = amounts.get(b.categoryID)!;
-          const headroom = goingUp ? b.max - cur : cur - b.min;
-          const share =
-            totalHeadroom > 0
-              ? (headroom / totalHeadroom) * diff
-              : diff / canAdjust.length;
+  //       for (const b of canAdjust) {
+  //         const cur = amounts.get(b.categoryID)!;
+  //         const headroom = goingUp ? b.max - cur : cur - b.min;
+  //         const share =
+  //           totalHeadroom > 0
+  //             ? (headroom / totalHeadroom) * diff
+  //             : diff / canAdjust.length;
 
-          const newAmount = Math.min(Math.max(cur + share, b.min), b.max);
-          amounts.set(b.categoryID, newAmount);
-        }
-      }
+  //         const newAmount = Math.min(Math.max(cur + share, b.min), b.max);
+  //         amounts.set(b.categoryID, newAmount);
+  //       }
+  //     }
 
-      const finalSum = [...amounts.values()].reduce((s, v) => s + v, 0);
-      const roundingError = neededFromRecipients - finalSum;
+  //     const finalSum = [...amounts.values()].reduce((s, v) => s + v, 0);
+  //     const roundingError = neededFromRecipients - finalSum;
 
-      if (Math.abs(roundingError) >= 1) {
-        const adjustable = allRecipients.find((b) => {
-          const cur = amounts.get(b.categoryID)!;
-          return roundingError > 0 ? cur < b.max : cur > b.min;
-        });
-        if (adjustable) {
-          const cur = amounts.get(adjustable.categoryID)!;
-          amounts.set(
-            adjustable.categoryID,
-            Math.min(
-              Math.max(cur + roundingError, adjustable.min),
-              adjustable.max,
-            ),
-          );
-        }
-      }
+  //     if (Math.abs(roundingError) >= 1) {
+  //       const adjustable = allRecipients.find((b) => {
+  //         const cur = amounts.get(b.categoryID)!;
+  //         return roundingError > 0 ? cur < b.max : cur > b.min;
+  //       });
+  //       if (adjustable) {
+  //         const cur = amounts.get(adjustable.categoryID)!;
+  //         amounts.set(
+  //           adjustable.categoryID,
+  //           Math.min(
+  //             Math.max(cur + roundingError, adjustable.min),
+  //             adjustable.max,
+  //           ),
+  //         );
+  //       }
+  //     }
 
-      return prev.map((b) => {
-        if (b.categoryID === id) return { ...b, currentAmount: sanitizedNewVal };
-        if (amounts.has(b.categoryID)) {
-          return { ...b, currentAmount: Math.round(amounts.get(b.categoryID)!) };
-        }
-        return b;
-      });
-    });
-  };
+  //     return prev.map((b) => {
+  //       if (b.categoryID === id)
+  //         return { ...b, currentAmount: sanitizedNewVal };
+  //       if (amounts.has(b.categoryID)) {
+  //         return {
+  //           ...b,
+  //           currentAmount: Math.round(amounts.get(b.categoryID)!),
+  //         };
+  //       }
+  //       return b;
+  //     });
+  //   });
+  // };
+
+const setAmount = (id: number, newVal: number) => {
+  setBudgets((prev) => redistributeBudget(prev, id, newVal, event.totalBudget));
+};
 
   // ─── נעילה ───────────────────────────────────────────────────────
   const toggleLock = (id: number) =>
@@ -290,20 +337,25 @@ const EventDetailPage = ({
     );
   };
 
+  // const fillPct = (b: CategoryBudget) => {
+  //   const range = b.max - b.min;
+  //   if (range <= 0) return 0;
+  //   const clamped = Math.min(Math.max(b.currentAmount, b.min), b.max);
+  //   const pct = Math.min(100, Math.max(0, ((clamped - b.min) / range) * 100));
+  //   return 100 - pct;
+  // };
   const fillPct = (b: CategoryBudget) => {
     const range = b.max - b.min;
     if (range <= 0) return 0;
     const clamped = Math.min(Math.max(b.currentAmount, b.min), b.max);
-    const pct = Math.min(100, Math.max(0, ((clamped - b.min) / range) * 100));
-    return 100 - pct;
+    return ((clamped - b.min) / range) * 100; // הסרנו את 100 - pct
   };
-
   // ─── שמירה ───────────────────────────────────────────────────────
   const handleSave = async () => {
     setIsSaving(true);
     setSaveError(null);
     try {
-      const payload =   await buildBudgetPayload(budgets, event);
+      const payload = await buildBudgetPayload(budgets, event);
       await saveAllBudgetItems(payload);
 
       const savedBudgets = budgets.map((b) => ({
@@ -382,14 +434,22 @@ const EventDetailPage = ({
                 <div className="card-header">
                   <div className="category-name">{b.categoryName}</div>
                   <div className="card-actions">
-                    <button
+                    {/* <button
                       className={`action-btn ${b.locked ? "active-lock" : ""}`}
                       onClick={() => toggleLock(b.categoryID)}
                       title={b.locked ? "בטל נעילה" : "נעל קטגוריה זו"}
                       disabled={b.ignored}
                     >
                       {b.locked ? "🔒" : "🔓"}
-                    </button>
+                    </button> */}
+                    <button
+  className={`action-btn ${b.locked ? "active-lock" : ""}`}
+  onClick={() => !b.vendorLocked && toggleLock(b.categoryID)}
+  title={b.vendorLocked ? "נעול על ידי ספק" : b.locked ? "בטל נעילה" : "נעל קטגוריה זו"}
+  disabled={b.ignored || !!b.vendorLocked}
+>
+  {b.locked ? "🔒" : "🔓"}
+</button>
                     <button
                       className={`action-btn ${b.ignored ? "active-ignore" : ""}`}
                       onClick={() =>
@@ -410,7 +470,7 @@ const EventDetailPage = ({
                   מתוכנן מקורי: ₪{fmt(b.plannedAmount)}
                 </div>
 
-                {b.ignored ? (
+                {/* {b.ignored ? (
                   <div
                     className="range-loading"
                     style={{ color: "#999", fontSize: "0.85rem" }}
@@ -420,20 +480,49 @@ const EventDetailPage = ({
                 ) : b.minLoading ? (
                   <div className="range-loading">מעדכן טווחים...</div>
                 ) : (
-                  <>
+                  <> */}
+                  {b.ignored ? (
+  <div className="range-loading" style={{ color: "#999", fontSize: "0.85rem" }}>
+    קטגוריה זו הוסרה — הסכום חולק לאחרים
+  </div>
+) : b.vendorLocked ? (
+  <div style={{
+    marginTop: "12px",
+    padding: "10px 14px",
+    background: "rgba(201,168,76,0.08)",
+    borderRadius: "8px",
+    border: "1px solid rgba(201,168,76,0.25)",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  }}>
+    <span style={{ color: "#c9a84c", fontSize: "0.9rem" }}>
+      ✓ {b.selectedVendorName}
+    </span>
+    <span style={{ color: "#c9a84c", fontWeight: 700 }}>
+      ₪{fmt(b.currentAmount)}
+    </span>
+  </div>
+) : b.minLoading ? (
+  <div className="range-loading">מעדכן טווחים...</div>
+) : (
+  <>
                     <div className="slider-area">
                       <div className="range-label min">₪{fmt(b.min)}</div>
-                      <div className="slider-wrap" dir="ltr">
+                      <div className="slider-wrap" dir="rtl">
+                        {" "}
+                        {/* שינוי: dir="rtl" */}
                         <input
                           type="range"
                           className="budget-slider"
                           style={{ "--fill": `${fillPct(b)}%` } as any}
                           min={b.min}
                           max={b.max}
-                          value={b.currentAmount}
+                          value={b.currentAmount} // חזרה לערך המקורי
                           disabled={b.locked || b.ignored}
-                          onChange={(e) =>
-                            setAmount(b.categoryID, Number(e.target.value))
+                          onChange={
+                            (e) =>
+                              setAmount(b.categoryID, Number(e.target.value)) // חזרה למקורי
                           }
                         />
                       </div>
