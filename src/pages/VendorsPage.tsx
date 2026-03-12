@@ -20,6 +20,8 @@ interface Props {
   onBack: () => void;
   onProceedToTasks: (selected: Record<number, SelectedVendor>) => void;
   onSaveSelected?: (selected: Record<number, SelectedVendor>) => void;
+  // onVendorSelected?: (categoryID: number, price: number) => void; // ← חדש
+onVendorSelected?: (categoryID: number, price: number, vendorName?: string) => void;
 }
 
 const VendorsPage = ({
@@ -29,6 +31,7 @@ const VendorsPage = ({
   onBack,
   onProceedToTasks,
   onSaveSelected,
+  onVendorSelected,
 }: Props) => {
   // const [activeTab, setActiveTab] = useState<number>(budgets[0]?.categoryID ?? 0);
   //   const [activeTab, setActiveTab] = useState<BudgetItem>(
@@ -79,16 +82,32 @@ const VendorsPage = ({
   // ── רק קטגוריות פעילות לטאבים ──
   const activeCategories = budgets.filter((cat) => !cat.isIgnore);
 
-  const toggleVendor = (
-    catID: number,
-    vendor: { id: number; name: string },
-  ) => {
-    setSelected((prev) =>
-      prev[catID]?.id === vendor.id
-        ? { ...prev, [catID]: { id: 0, name: "" } }
-        : { ...prev, [catID]: vendor },
-    );
-  };
+
+
+  // const toggleVendor = (
+  //   catID: number,
+  //   vendor: { id: number; name: string },
+  //   price: number,
+  // ) => {
+  //   // ← הוסף price
+  //   setSelected((prev) =>
+  //     prev[catID]?.id === vendor.id
+  //       ? { ...prev, [catID]: { id: 0, name: "" } }
+  //       : { ...prev, [catID]: vendor },
+  //   );
+  //   onVendorSelected?.(catID, price); // ← חדש
+  // };
+
+// ב-toggleVendor
+const toggleVendor = (catID: number, vendor: { id: number; name: string }, price: number) => {
+  const isDeselecting = selected[catID]?.id === vendor.id;
+  setSelected((prev) =>
+    isDeselecting
+      ? { ...prev, [catID]: { id: 0, name: "" } }
+      : { ...prev, [catID]: vendor },
+  );
+  onVendorSelected?.(catID, isDeselecting ? 0 : price, isDeselecting ? undefined : vendor.name);
+};
 
   const selectedCount = Object.values(selected).filter((v) => v?.id > 0).length;
 
@@ -171,13 +190,28 @@ const VendorsPage = ({
                       key={v.vendorID}
                       className={`vendor-card ${isSelected ? "selected" : ""} ${isOver ? "over-budget" : ""}`}
                       style={{ animationDelay: `${i * 0.08}s` }}
-                      onClick={() =>
-                        !isOver &&
-                        toggleVendor(activeTab, {
-                          id: v.vendorID,
-                          name: v.businessName,
-                        })
-                      }
+                      // onClick={() =>
+                      //   !isOver &&
+                      //   toggleVendor(activeTab, {
+                      //     id: v.vendorID,
+                      //     name: v.businessName,
+                      //   })
+                      // }
+                      // onClick={
+                      //   () =>
+                      //     !isOver &&
+                      //     toggleVendor(
+                      //       activeTab,
+                      //       { id: v.vendorID, name: v.businessName },
+                      //       Number(v.basePrice),
+                      //     ) // ← הוסף basePrice
+                      // }
+
+// ב-onClick של vendor-card
+onClick={() =>
+  !isOver && toggleVendor(activeTab, { id: v.vendorID, name: v.businessName }, Number(v.basePrice))
+}
+
                     >
                       {isSelected && (
                         <div className="vendor-selected-badge">✓ נבחר</div>

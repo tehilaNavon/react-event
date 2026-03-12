@@ -127,6 +127,9 @@ import TasksPage from "./pages/TasksPage";
 import { isAuthenticated, logoutUser } from "./services/authService";
 import { type EventDtoo } from "./types/event";
 import type { BudgetItem } from "./types/budgetItem";
+// הוסף את הטיפוס
+import type { CategoryBudget } from "./pages/BudgetItemsPage";
+import { redistributeBudget } from "./utils/budgetUtils";
 
 type Tab = "login" | "register";
 type Page = "events" | "detail" | "vendors" | "tasks";
@@ -146,6 +149,7 @@ const App: React.FC = () => {
   const [tab, setTab] = useState<Tab>("login");
   const [success, setSuccess] = useState<SuccessState | null>(null);
   const [loggedIn, setLoggedIn] = useState<boolean>(isAuthenticated());
+  const [savedBudgets, setSavedBudgets] = useState<CategoryBudget[]>([]);
 
   // ── Navigation state (חדש) ──
   const [page, setPage] = useState<Page>("events");
@@ -173,6 +177,86 @@ const App: React.FC = () => {
     setSelectedEvent(null);
   };
 
+  // const handleVendorSelected = (
+  //   categoryID: number,
+  //   price: number,
+  //   vendorName?: string,
+  // ) => {
+  //   if (price === 0) {
+  //     // ביטול ספק — שחרר נעילה ומחק שם
+  //     setSavedBudgets((prev) =>
+  //       prev.map((b) =>
+  //         b.categoryID === categoryID
+  //           ? {
+  //               ...b,
+  //               locked: false,
+  //               vendorLocked: false,
+  //               selectedVendorName: undefined,
+  //             }
+  //           : b,
+  //       ),
+  //     );
+  //   } else {
+  //     // בחירת ספק — נעל, שמור שם, וחלק יחסית לאחרים
+  //     setSavedBudgets((prev) =>
+  //       redistributeBudget(
+  //         prev.map((b) =>
+  //           b.categoryID === categoryID
+  //             ? {
+  //                 ...b,
+  //                 locked: true,
+  //                 vendorLocked: true,
+  //                 selectedVendorName: vendorName,
+  //               }
+  //             : b,
+  //         ),
+  //         categoryID,
+  //         price,
+  //         selectedEvent!.totalBudget,
+  //       ),
+  //     );
+  //   }
+  // };
+  const handleVendorSelected = (categoryID: number, price: number, vendorName?: string) => {
+  if (price === 0) {
+    setSavedBudgets((prev) =>
+      prev.map((b) =>
+        b.categoryID === categoryID
+          ? { ...b, locked: false, vendorLocked: false, selectedVendorName: undefined }
+          : b
+      )
+    );
+  } else {
+    setSavedBudgets((prev) => {
+      // שלב 1 — עדכן את הסכום של הקטגוריה הנבחרת ללא נעילה עדיין
+      const withNewAmount = prev.map((b) =>
+        b.categoryID === categoryID
+          ? { ...b, currentAmount: price,  locked: false, vendorLocked: false }
+          : b
+      );
+
+      // שלב 2 — חלק את ההפרש לאחרים
+      const redistributed = redistributeBudget(
+        withNewAmount,
+        categoryID,
+        price,
+        selectedEvent!.totalBudget,
+      );
+
+      // שלב 3 — עכשיו נעל
+      return redistributed.map((b) =>
+        b.categoryID === categoryID
+          ? { ...b, locked: true, vendorLocked: true, selectedVendorName: vendorName }
+          : b
+      );
+    });
+  }
+};
+  // const handleVendorSelected = (categoryID: number, price: number) => {
+  //   setSavedBudgets((prev) =>
+  //     redistributeBudget(prev, categoryID, price, selectedEvent!.totalBudget)
+  //   );
+  // };
   // ── לא מחובר — זהה למקור לחלוטין ──
   if (!loggedIn) {
     return (
@@ -256,17 +340,48 @@ const App: React.FC = () => {
   //   );
   // }
   // אחרי:
+  // if (page === "detail" && selectedEvent) {
+  //   return (
+  //     <EventDetailPage
+  //       event={selectedEvent}
+  //       onBack={() => setPage("events")}
+
+  //       onProceedToVendors={(b) => {
+  //         setBudgets(b);
+  //         setPage("vendors");
+  //       }}
+  //       onEventUpdate={(updatedBudgets) => {
+  //         setSelectedEvent((prev) => {
+  //           if (!prev) return prev;
+  //           return {
+  //             ...prev,
+  //             budgetItems: prev.budgetItems?.map((item) => {
+  //               const updated = updatedBudgets.find(
+  //                 (b) => b.categoryID === item.categoryID,
+  //               );
+  //               return updated
+  //                 ? { ...item, plannedAmount: updated.currentAmount }
+  //                 : item;
+  //             }),
+  //           };
+  //         });
+  //       }}
+  //     />
+  //   );
+  // }
+  // שנה את ה-EventDetailPage render:
   if (page === "detail" && selectedEvent) {
     return (
       <EventDetailPage
         event={selectedEvent}
+        initialBudgets={savedBudgets} // ← חדש
         onBack={() => setPage("events")}
-      
         onProceedToVendors={(b) => {
           setBudgets(b);
           setPage("vendors");
         }}
         onEventUpdate={(updatedBudgets) => {
+          setSavedBudgets(updatedBudgets); // ← חדש
           setSelectedEvent((prev) => {
             if (!prev) return prev;
             return {
@@ -285,15 +400,15 @@ const App: React.FC = () => {
       />
     );
   }
-
   if (page === "vendors" && selectedEvent) {
     return (
       <VendorsPage
         event={selectedEvent}
         budgets={budgets}
         initialSelected={selectedVendors} // ← הוסף
-        onSaveSelected={(v) => setSelectedVendors(v)}  // ← הוסף
+        onSaveSelected={(v) => setSelectedVendors(v)} // ← הוסף
         onBack={() => setPage("detail")}
+        onVendorSelected={handleVendorSelected}
         onProceedToTasks={(v) => {
           setSelectedVendors(v);
           setPage("tasks");
@@ -316,13 +431,24 @@ const App: React.FC = () => {
     );
   }
 
+  // return (
+  //   <EventsPage
+  //     onLogout={handleLogout}
+  //     onSelectEvent={(event) => {
+  //       setSelectedEvent(event);
+  //         setSelectedVendors({});  // ← איפוס בחירות
+
+  //       setPage("detail");
+  //     }}
+  //   />
+  // );
   return (
     <EventsPage
       onLogout={handleLogout}
       onSelectEvent={(event) => {
         setSelectedEvent(event);
-          setSelectedVendors({});  // ← איפוס בחירות
-
+        setSelectedVendors({});
+        setSavedBudgets([]); // ← כאן
         setPage("detail");
       }}
     />
