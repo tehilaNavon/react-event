@@ -15,3 +15,11 @@ export const getVendorsByCategory = async (categoryID: number): Promise<VendorDt
   if (!res.ok) throw new Error("Failed to fetch vendors");
   return res.json();
 };
+export const saveSelectedVendors = async (eventId: number, vendorIds: number[]) => {
+  console.log("Saving selected vendors for event", eventId, ":", vendorIds);
+  await authFetch(`/vendor/event/${eventId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(vendorIds),
+  });
+};

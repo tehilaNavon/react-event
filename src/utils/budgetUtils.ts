@@ -1,4 +1,4 @@
-import type { CategoryBudget } from "../pages/BudgetItemsPage";
+import type { CategoryBudget } from "..//types/budgetItem";
 
 export const redistributeBudget = (
   prev: CategoryBudget[],
