@@ -8,32 +8,14 @@ import {
   saveAllBudgetItems,
 } from "../services/BudgetItemService";
 import { redistributeBudget } from "../utils/budgetUtils";
+import type { CategoryBudget } from "../types/budgetItem";
 
-export interface CategoryBudget {
-  categoryID: number;
-  categoryName: string;
-  plannedAmount: number;
-  currentAmount: number;
-  min: number;
-  max: number;
-  minLoading: boolean;
-  locked: boolean;
-  ignored: boolean;
-  selected: boolean;
-  vendorLocked?: boolean;        // ← חדש
-  selectedVendorName?: string; 
-}
 
-// interface Props {
-//   event: EventDtoo;
-//   onBack: () => void;
-//   onProceedToVendors: (budgets: CategoryBudget[]) => void;
-//   onEventUpdate?: (updatedBudgets: CategoryBudget[]) => void;
-// }
-// הוסף ל-Props
+
+
 interface Props {
   event: EventDtoo;
-  initialBudgets?: CategoryBudget[];   // ← חדש
+  initialBudgets?: CategoryBudget[]; // ← חדש
   onBack: () => void;
   onProceedToVendors: (budgets: CategoryBudget[]) => void;
   onEventUpdate?: (updatedBudgets: CategoryBudget[]) => void;
@@ -41,21 +23,13 @@ interface Props {
 
 const fmt = (n: number) => Math.round(n).toLocaleString("he-IL");
 
-// const EventDetailPage = ({
-//   event,
-//   onBack,
-//   onProceedToVendors,
-//   onEventUpdate,
-// }: Props) => {
-// שנה את הפונקציה לקבל את initialBudgets
 const EventDetailPage = ({
   event,
-  initialBudgets,   // ← חדש
+  initialBudgets, // ← חדש
   onBack,
   onProceedToVendors,
   onEventUpdate,
 }: Props) => {
-
   const initialData = useMemo(() => {
     return (event.budgetItems ?? []).map((item) => ({
       categoryID: item.categoryID,
@@ -66,58 +40,65 @@ const EventDetailPage = ({
       min: 0,
       max: item.plannedAmount * 2 || 10000,
       minLoading: true,
-      locked: false,
-      ignored: false,
+      locked: item.isLocked ?? false,
+      ignored: item.isIgnore ?? false,
       selected: false,
     }));
   }, [event.eventID, event.budgetItems]);
 
-  // const [budgets, setBudgets] = useState<CategoryBudget[]>(initialData);
- // שנה את ה-useState של budgets:
-const [budgets, setBudgets] = useState<CategoryBudget[]>(
-  initialBudgets && initialBudgets.length > 0 ? initialBudgets : initialData
-);
+  const [budgets, setBudgets] = useState<CategoryBudget[]>(
+    initialBudgets && initialBudgets.length > 0 ? initialBudgets : initialData,
+  );
 
   const [confirmIgnoreId, setConfirmIgnoreId] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // useEffect(() => {
-  //   setBudgets(initialData);
-  // }, [event.eventID]);
-// שנה את ה-useEffect של event.eventID:
-useEffect(() => {
-  if (initialBudgets && initialBudgets.length > 0) {
-    setBudgets(initialBudgets);   // ← שחזור מהשמור
-  } else {
-    setBudgets(initialData);
-  }
-}, [event.eventID]);
   useEffect(() => {
-    const items = event.budgetItems ?? [];
-    if (items.length === 0) return;
-    ///// הוספת בדיקה לטעינת טווחים רק אם אין נתונים שמורים
-if (initialBudgets && initialBudgets.length > 0) return;  // אם יש נתונים שמורים, אל תבצע טעינה מחדש
+    if (initialBudgets && initialBudgets.length > 0) {
+      setBudgets(initialBudgets); // ← שחזור מהשמור
+    } else {
+      setBudgets(initialData);
+    }
+  }, [event.eventID]);
+ 
+useEffect(() => {
+  const items = event.budgetItems ?? [];
+  if (items.length === 0) return;
+
+  if (initialBudgets && initialBudgets.length > 0) {
+    setBudgets(initialBudgets);
+
+    // טען טווחים רק לקטגוריות ללא ספק נעול
+    const itemsToLoad = items.filter(
+      (item) =>
+        !initialBudgets.find((b) => b.categoryID === item.categoryID)
+          ?.vendorLocked,
+    );
+    if (itemsToLoad.length === 0) return;
+
     const fetchData = async () => {
-      for (const item of items) {
+      for (const item of itemsToLoad) {
         const categoryID = item.categoryID;
         try {
           const { min, max } = await fetchCategoryPriceRange(
             categoryID,
             item.plannedAmount * 2,
           );
-
           setBudgets((prev) =>
             prev.map((b) =>
               b.categoryID === categoryID
                 ? {
                     ...b,
-                    min,
-                    max,
-                    currentAmount: Math.min(
-                      Math.max(b.currentAmount, min),
-                      max,
-                    ),
+                    min: categoryID === 3 ? min * event.guestCount : min,
+                    max: categoryID === 3 ? max * event.guestCount : max,
+                    currentAmount:
+                      categoryID === 3
+                        ? Math.min(
+                            Math.max(b.currentAmount, min * event.guestCount),
+                            max * event.guestCount,
+                          )
+                        : Math.min(Math.max(b.currentAmount, min), max),
                     minLoading: false,
                   }
                 : b,
@@ -133,10 +114,11 @@ if (initialBudgets && initialBudgets.length > 0) return;  // אם יש נתונ�
         }
       }
     };
-
     fetchData();
-  }, [event.eventID]);
-
+  } else {
+    setBudgets(initialData);
+  }
+}, [event.eventID]);
   // ─── חישובים לתצוגה ───────────────────────────────────────────────
   const activeItems = budgets.filter((b) => !b.ignored);
   const totalAllocated = activeItems.reduce((s, b) => s + b.currentAmount, 0);
@@ -147,114 +129,11 @@ if (initialBudgets && initialBudgets.length > 0) return;  // אם יש נתונ�
       : 0;
 
   // ─── שינוי ידני בסליידר ───────────────────────────────────────────
-  // const setAmount = (id: number, newVal: number) => {
-  //   setBudgets((prev) => {
-  //     const target = prev.find((b) => b.categoryID === id);
-  //     if (!target || target.locked || target.ignored) return prev;
-
-  //     const sanitizedNewVal = Math.min(
-  //       Math.max(newVal, target.min),
-  //       target.max,
-  //     );
-  //     if (sanitizedNewVal === target.currentAmount) return prev;
-
-  //     const lockedTotal = prev
-  //       .filter((b) => b.categoryID !== id && (b.locked || b.ignored))
-  //       .reduce((s, b) => s + (b.ignored ? 0 : b.currentAmount), 0);
-
-  //     const neededFromRecipients =
-  //       event.totalBudget - sanitizedNewVal - lockedTotal;
-
-  //     const allRecipients = prev.filter(
-  //       (b) => b.categoryID !== id && !b.ignored && !b.locked,
-  //     );
-
-  //     if (allRecipients.length === 0) return prev;
-
-  //     const minPossible = allRecipients.reduce((s, b) => s + b.min, 0);
-  //     const maxPossible = allRecipients.reduce((s, b) => s + b.max, 0);
-
-  //     if (
-  //       neededFromRecipients < minPossible ||
-  //       neededFromRecipients > maxPossible
-  //     ) {
-  //       return prev;
-  //     }
-
-  //     let amounts = new Map<number, number>(
-  //       allRecipients.map((b) => [b.categoryID, b.currentAmount]),
-  //     );
-
-  //     for (let round = 0; round < allRecipients.length + 1; round++) {
-  //       const currentSum = [...amounts.values()].reduce((s, v) => s + v, 0);
-  //       const diff = neededFromRecipients - currentSum;
-
-  //       if (Math.abs(diff) < 1) break;
-
-  //       const goingUp = diff > 0;
-
-  //       const canAdjust = allRecipients.filter((b) => {
-  //         const cur = amounts.get(b.categoryID)!;
-  //         return goingUp ? cur < b.max : cur > b.min;
-  //       });
-
-  //       if (canAdjust.length === 0) break;
-
-  //       const totalHeadroom = canAdjust.reduce((s, b) => {
-  //         const cur = amounts.get(b.categoryID)!;
-  //         return s + (goingUp ? b.max - cur : cur - b.min);
-  //       }, 0);
-
-  //       for (const b of canAdjust) {
-  //         const cur = amounts.get(b.categoryID)!;
-  //         const headroom = goingUp ? b.max - cur : cur - b.min;
-  //         const share =
-  //           totalHeadroom > 0
-  //             ? (headroom / totalHeadroom) * diff
-  //             : diff / canAdjust.length;
-
-  //         const newAmount = Math.min(Math.max(cur + share, b.min), b.max);
-  //         amounts.set(b.categoryID, newAmount);
-  //       }
-  //     }
-
-  //     const finalSum = [...amounts.values()].reduce((s, v) => s + v, 0);
-  //     const roundingError = neededFromRecipients - finalSum;
-
-  //     if (Math.abs(roundingError) >= 1) {
-  //       const adjustable = allRecipients.find((b) => {
-  //         const cur = amounts.get(b.categoryID)!;
-  //         return roundingError > 0 ? cur < b.max : cur > b.min;
-  //       });
-  //       if (adjustable) {
-  //         const cur = amounts.get(adjustable.categoryID)!;
-  //         amounts.set(
-  //           adjustable.categoryID,
-  //           Math.min(
-  //             Math.max(cur + roundingError, adjustable.min),
-  //             adjustable.max,
-  //           ),
-  //         );
-  //       }
-  //     }
-
-  //     return prev.map((b) => {
-  //       if (b.categoryID === id)
-  //         return { ...b, currentAmount: sanitizedNewVal };
-  //       if (amounts.has(b.categoryID)) {
-  //         return {
-  //           ...b,
-  //           currentAmount: Math.round(amounts.get(b.categoryID)!),
-  //         };
-  //       }
-  //       return b;
-  //     });
-  //   });
-  // };
-
-const setAmount = (id: number, newVal: number) => {
-  setBudgets((prev) => redistributeBudget(prev, id, newVal, event.totalBudget));
-};
+  const setAmount = (id: number, newVal: number) => {
+    setBudgets((prev) =>
+      redistributeBudget(prev, id, newVal, event.totalBudget),
+    );
+  };
 
   // ─── נעילה ───────────────────────────────────────────────────────
   const toggleLock = (id: number) =>
@@ -337,18 +216,11 @@ const setAmount = (id: number, newVal: number) => {
     );
   };
 
-  // const fillPct = (b: CategoryBudget) => {
-  //   const range = b.max - b.min;
-  //   if (range <= 0) return 0;
-  //   const clamped = Math.min(Math.max(b.currentAmount, b.min), b.max);
-  //   const pct = Math.min(100, Math.max(0, ((clamped - b.min) / range) * 100));
-  //   return 100 - pct;
-  // };
   const fillPct = (b: CategoryBudget) => {
     const range = b.max - b.min;
     if (range <= 0) return 0;
     const clamped = Math.min(Math.max(b.currentAmount, b.min), b.max);
-    return ((clamped - b.min) / range) * 100; // הסרנו את 100 - pct
+    return ((clamped - b.min) / range) * 100;
   };
   // ─── שמירה ───────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -434,22 +306,22 @@ const setAmount = (id: number, newVal: number) => {
                 <div className="card-header">
                   <div className="category-name">{b.categoryName}</div>
                   <div className="card-actions">
-                    {/* <button
+                    <button
                       className={`action-btn ${b.locked ? "active-lock" : ""}`}
-                      onClick={() => toggleLock(b.categoryID)}
-                      title={b.locked ? "בטל נעילה" : "נעל קטגוריה זו"}
-                      disabled={b.ignored}
+                      onClick={() =>
+                        !b.vendorLocked && toggleLock(b.categoryID)
+                      }
+                      title={
+                        b.vendorLocked
+                          ? "נעול על ידי ספק"
+                          : b.locked
+                            ? "בטל נעילה"
+                            : "נעל קטגוריה זו"
+                      }
+                      disabled={b.ignored || !!b.vendorLocked}
                     >
                       {b.locked ? "🔒" : "🔓"}
-                    </button> */}
-                    <button
-  className={`action-btn ${b.locked ? "active-lock" : ""}`}
-  onClick={() => !b.vendorLocked && toggleLock(b.categoryID)}
-  title={b.vendorLocked ? "נעול על ידי ספק" : b.locked ? "בטל נעילה" : "נעל קטגוריה זו"}
-  disabled={b.ignored || !!b.vendorLocked}
->
-  {b.locked ? "🔒" : "🔓"}
-</button>
+                    </button>
                     <button
                       className={`action-btn ${b.ignored ? "active-ignore" : ""}`}
                       onClick={() =>
@@ -469,44 +341,37 @@ const setAmount = (id: number, newVal: number) => {
                 <div className="planned-amount">
                   מתוכנן מקורי: ₪{fmt(b.plannedAmount)}
                 </div>
-
-                {/* {b.ignored ? (
+                {b.ignored ? (
                   <div
                     className="range-loading"
                     style={{ color: "#999", fontSize: "0.85rem" }}
                   >
                     קטגוריה זו הוסרה — הסכום חולק לאחרים
                   </div>
+                ) : b.vendorLocked ? (
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      padding: "10px 14px",
+                      background: "rgba(201,168,76,0.08)",
+                      borderRadius: "8px",
+                      border: "1px solid rgba(201,168,76,0.25)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span style={{ color: "#c9a84c", fontSize: "0.9rem" }}>
+                      ✓ {b.selectedVendorName}
+                    </span>
+                    <span style={{ color: "#c9a84c", fontWeight: 700 }}>
+                      ₪{fmt(b.currentAmount)}
+                    </span>
+                  </div>
                 ) : b.minLoading ? (
                   <div className="range-loading">מעדכן טווחים...</div>
                 ) : (
-                  <> */}
-                  {b.ignored ? (
-  <div className="range-loading" style={{ color: "#999", fontSize: "0.85rem" }}>
-    קטגוריה זו הוסרה — הסכום חולק לאחרים
-  </div>
-) : b.vendorLocked ? (
-  <div style={{
-    marginTop: "12px",
-    padding: "10px 14px",
-    background: "rgba(201,168,76,0.08)",
-    borderRadius: "8px",
-    border: "1px solid rgba(201,168,76,0.25)",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  }}>
-    <span style={{ color: "#c9a84c", fontSize: "0.9rem" }}>
-      ✓ {b.selectedVendorName}
-    </span>
-    <span style={{ color: "#c9a84c", fontWeight: 700 }}>
-      ₪{fmt(b.currentAmount)}
-    </span>
-  </div>
-) : b.minLoading ? (
-  <div className="range-loading">מעדכן טווחים...</div>
-) : (
-  <>
+                  <>
                     <div className="slider-area">
                       <div className="range-label min">₪{fmt(b.min)}</div>
                       <div className="slider-wrap" dir="rtl">

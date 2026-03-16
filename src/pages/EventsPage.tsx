@@ -203,7 +203,8 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                         </div>
                         <button
                           className="btn-delete"
-                          onClick={() => handleDelete(event.eventID)}
+                          onClick={(e) =>{ e.stopPropagation();
+                             handleDelete(event.eventID)}}
                           title="מחק אירוע"
                         >
                           🗑

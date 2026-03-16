@@ -1,5 +1,6 @@
 // src/types/event.ts
 import type { BudgetItem } from "./budgetItem";
+import type { VendorDtoo } from "./vendor";
 export interface EventDtoo {
   eventID: number;
   eventName: string;
@@ -9,7 +10,7 @@ export interface EventDtoo {
   totalBudget: number;
   guestCount: number;
   budgetItems ?: BudgetItem[];
-
+  vendors?: VendorDtoo[];
 }
 
 export interface EventCreateDto {

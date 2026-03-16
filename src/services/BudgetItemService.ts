@@ -1,10 +1,12 @@
 import { authFetch } from "./authService";
-import { type CategoryBudget } from "../pages/BudgetItemsPage"; // adjust path as needed
+import { type CategoryBudget } from "../types/budgetItem"; // adjust path as needed
 import { type EventDtoo } from "../types/event";
 import type { BudgetItemPayload } from "../types/budgetItem";
 import { getCategories } from "./categoryService";
 
+
 export const fetchCategoryPriceRange = async (
+  
   categoryID: number,
   fallbackMax: number,
 ): Promise<{ min: number; max: number }> => {
@@ -14,8 +16,8 @@ export const fetchCategoryPriceRange = async (
   ]);
 
   return {
-    min: Number(minRes) || 0,
-    max: Number(maxRes) || fallbackMax,
+    min: Number(minRes ) || 0,
+    max: Number(maxRes ) || fallbackMax,
   };
 };
 
