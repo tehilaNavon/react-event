@@ -3,7 +3,7 @@ import { GOLD } from "../styles/theme";
 import { useAuth } from "../hooks/useAuth";
 
 interface RegisterPageProps {
-  onSuccess: (email: string) => void;
+  onSuccess: (name: string) => void;
   onGoLogin: () => void;
 }
 
@@ -30,7 +30,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
     }
     setLocalError("");
     const ok = await register(name, email, phone, password);
-    if (ok) onSuccess(email);
+    if (ok) onSuccess(name);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

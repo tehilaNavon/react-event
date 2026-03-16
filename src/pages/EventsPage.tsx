@@ -1,7 +1,17 @@
 // src/pages/EventsPage.tsx
-import  { useEffect, useState } from "react";
-import { getEvents, createEvent, deleteEvent, getEventTypes,getEventById  } from "../services/eventService";
-import { type EventDtoo, type EventCreateDto, type EventTypeDtoo } from "../types/event";
+import { useEffect, useState } from "react";
+import {
+  getEvents,
+  createEvent,
+  deleteEvent,
+  getEventTypes,
+  getEventById,
+} from "../services/eventService";
+import {
+  type EventDtoo,
+  type EventCreateDto,
+  type EventTypeDtoo,
+} from "../types/event";
 import { getToken } from "../services/authService";
 import { pageStyles } from "../styles/EventStyle";
 
@@ -16,8 +26,6 @@ const getUserIdFromToken = (): number => {
     return 0;
   }
 };
-
-
 
 // ── Component ─────────────────────────────────────────────
 interface EventsPageProps {
@@ -66,7 +74,10 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
       setEventTypes(data);
       // set default selection to first type
       if (data.length > 0) {
-        setForm((prev) => ({ ...prev, eventTypeID: Number(data[0].eventTypeID) }));
+        setForm((prev) => ({
+          ...prev,
+          eventTypeID: Number(data[0].eventTypeID),
+        }));
       }
     } catch (err) {
       console.error("Failed to load event types", err);
@@ -75,8 +86,21 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
 
   // ── Create event ──
   const handleSubmit = async () => {
-    if (!form.eventName || !form.eventDate) {
-      setModalError("נא למלא שם ותאריך לאירוע.");
+    // בדיקות תקינות – זהות לשרת
+    if (!form.eventName || form.eventName.trim() === "") {
+      setModalError("שם אירוע חובה");
+      return;
+    }
+    if (!form.eventDate || new Date(form.eventDate) <= new Date()) {
+      setModalError("תאריך חייב להיות בעתיד");
+      return;
+    }
+    if (form.totalBudget < 10000) {
+      setModalError("תקציב חייב להיות לפחות 10,000 ₪");
+      return;
+    }
+    if (form.guestCount < 30) {
+      setModalError("מספר אורחים חייב להיות לפחות 30");
       return;
     }
     setSubmitting(true);
@@ -117,11 +141,16 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString("he-IL", { day: "2-digit", month: "long", year: "numeric" });
+    return d.toLocaleDateString("he-IL", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
   };
 
   const getTypeName = (typeId: string) =>
-    eventTypes.find((t) => String(t.eventTypeID) === String(typeId))?.eventTypeName ?? "אירוע";
+    eventTypes.find((t) => String(t.eventTypeID) === String(typeId))
+      ?.eventTypeName ?? "אירוע";
 
   return (
     <>
@@ -167,7 +196,9 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                   <div className="events-empty">
                     <div className="events-empty-icon">✦</div>
                     <div className="events-empty-title">אין אירועים עדיין</div>
-                    <div className="events-empty-sub">לחצי על + אירוע חדש כדי להתחיל</div>
+                    <div className="events-empty-sub">
+                      לחצי על + אירוע חדש כדי להתחיל
+                    </div>
                   </div>
                 ) : (
                   events.map((event, i) => (
@@ -176,9 +207,9 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                       key={event.eventID}
                       style={{ animationDelay: `${i * 0.08}s` }}
                       onClick={async () => {
-                      const full = await getEventById(event.eventID);
-                      onSelectEvent(full);
-                    }}
+                        const full = await getEventById(event.eventID);
+                        onSelectEvent(full);
+                      }}
                     >
                       <div className="card-type-badge">
                         {getTypeName(event.eventTypeID)}
@@ -203,8 +234,10 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                         </div>
                         <button
                           className="btn-delete"
-                          onClick={(e) =>{ e.stopPropagation();
-                             handleDelete(event.eventID)}}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(event.eventID);
+                          }}
                           title="מחק אירוע"
                         >
                           🗑
@@ -225,7 +258,12 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
             onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
           >
             <div className="modal">
-              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+              <button
+                className="modal-close"
+                onClick={() => setShowModal(false)}
+              >
+                ✕
+              </button>
               <div className="modal-title">אירוע חדש</div>
               <div className="modal-subtitle">מלאי את פרטי האירוע</div>
 
@@ -235,7 +273,9 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                   type="text"
                   placeholder="חתונת דנה ואלון"
                   value={form.eventName}
-                  onChange={(e) => setForm({ ...form, eventName: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, eventName: e.target.value })
+                  }
                 />
               </div>
 
@@ -245,7 +285,9 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                   type="date"
                   value={form.eventDate}
                   min={new Date().toISOString().split("T")[0]}
-                  onChange={(e) => setForm({ ...form, eventDate: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, eventDate: e.target.value })
+                  }
                 />
               </div>
 
@@ -253,7 +295,9 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                 <label>סוג אירוע</label>
                 <select
                   value={form.eventTypeID}
-                  onChange={(e) => setForm({ ...form, eventTypeID: Number(e.target.value) })}
+                  onChange={(e) =>
+                    setForm({ ...form, eventTypeID: Number(e.target.value) })
+                  }
                 >
                   {eventTypes.map((type) => (
                     <option key={type.eventTypeID} value={type.eventTypeID}>
@@ -271,7 +315,9 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                     placeholder="50000"
                     value={form.totalBudget || ""}
                     min="10000"
-                    onChange={(e) => setForm({ ...form, totalBudget: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setForm({ ...form, totalBudget: Number(e.target.value) })
+                    }
                   />
                 </div>
 
@@ -282,7 +328,9 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                     placeholder="150"
                     value={form.guestCount || ""}
                     min="100"
-                    onChange={(e) => setForm({ ...form, guestCount: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setForm({ ...form, guestCount: Number(e.target.value) })
+                    }
                   />
                 </div>
               </div>
@@ -290,10 +338,17 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
               {modalError && <div className="modal-error">{modalError}</div>}
 
               <div className="modal-actions">
-                <button className="btn-submit" onClick={handleSubmit} disabled={submitting}>
+                <button
+                  className="btn-submit"
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                >
                   {submitting ? "שומר..." : "צור אירוע"}
                 </button>
-                <button className="btn-cancel" onClick={() => setShowModal(false)}>
+                <button
+                  className="btn-cancel"
+                  onClick={() => setShowModal(false)}
+                >
                   ביטול
                 </button>
               </div>
