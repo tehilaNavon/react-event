@@ -1,4 +1,12 @@
-import { GOLD, GOLD_LIGHT, GOLD_DARK, BLACK, CARD, WHITE, GRAY } from "../styles/theme";
+import {
+  GOLD,
+  GOLD_LIGHT,
+  GOLD_DARK,
+  BLACK,
+  CARD,
+  WHITE,
+  GRAY,
+} from "../styles/theme";
 
 export const pageStyles = `
   html, body, #root {
@@ -19,7 +27,23 @@ export const pageStyles = `
     position: relative;
     overflow-x: hidden;
   }
+.btn-edit {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.2); /* צבע עמום כמו המחיקה */
+    font-size: 18px; /* הגדלתי מ-14px */
+    cursor: pointer;
+    padding: 10px; /* הגדלת שטח הלחיצה */
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
+  .btn-edit:hover {
+    color: #63b3ed; /* צבע כחול רק במעבר עכבר */
+    transform: scale(1.1); /* אפקט הגדלה קטן ב-hover */
+  }
   .events-bg-pattern {
     position: fixed; inset: 0;
     background-image:
@@ -179,14 +203,33 @@ export const pageStyles = `
 
   .card-budget-label { font-size: 9px; color: ${GRAY}; letter-spacing: 2px; margin-top: 2px; }
 
+  // .btn-delete {
+  //   background: none; border: none;
+  //   color: rgba(255,255,255,0.2); font-size: 14px;
+  //   cursor: pointer; padding: 8px;
+  //   transition: color 0.3s;
+  // }
+
+  // .btn-delete:hover { color: #e07070; }
+
+
   .btn-delete {
-    background: none; border: none;
-    color: rgba(255,255,255,0.2); font-size: 14px;
-    cursor: pointer; padding: 8px;
-    transition: color 0.3s;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 18px; /* הגדלתי מ-14px */
+    cursor: pointer;
+    padding: 10px; /* הגדלת שטח הלחיצה */
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .btn-delete:hover { color: #e07070; }
+  .btn-delete:hover {
+    color: #e07070; /* צבע אדום במעבר עכבר */
+    transform: scale(1.1);
+  }
 
   /* ── Empty state ── */
   .events-empty {

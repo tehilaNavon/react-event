@@ -48,3 +48,34 @@ export const deleteEvent = async (id: number): Promise<void> => {
   const res = await authFetch(`/Event/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete event");
 };
+
+
+export const updateEvent = async (
+  id: number,
+  event: EventDtoo,
+): Promise<EventDtoo> => {
+  const userID = JSON.parse(localStorage.getItem("user") || "{}").userID;
+
+  const payload: EventDtoo = {
+    eventID: id,
+    eventName: event.eventName,
+    eventDate: event.eventDate,
+    userID: userID,
+    eventTypeID: event.eventTypeID,
+    totalBudget: event.totalBudget,
+    guestCount: event.guestCount,
+    // budgetItems: event.budgetItems ?? [],
+    // vendors: event.vendors ?? [],
+  };
+  console.log("payload",payload)
+  const res = await authFetch(`/Event/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || "Failed to update event");
+  }
+  return res.json();
+};

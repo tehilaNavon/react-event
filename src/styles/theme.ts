@@ -14,7 +14,13 @@ export const globalStyles = `
     padding: 0;
     box-sizing: border-box;
   }
-
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: ${WHITE};
+  -webkit-box-shadow: 0 0 0px 1000px #161616 inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
   html, body, #root {
     width: 100%;
     height: 100%;

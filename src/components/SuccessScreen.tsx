@@ -10,13 +10,13 @@ interface SuccessScreenProps {
 const SuccessScreen: React.FC<SuccessScreenProps> = ({ mode, name, onReturn }) => (
   <div className="success-screen">
     <div className="success-icon">✦</div>
-    <div className="success-title">
-      {mode === "login" ? "Welcome Back" : "ברוך הבא ל-Élite"}
+    <div className="success-title" dir="rtl">
+      {mode === "login" ? "ברוך הבא" : "ברוך הבא ל-Élite"}
     </div>
     <div className="success-sub" style={{ color: GOLD, marginBottom: 12 }}>
       {name}
     </div>
-    <div className="success-sub">Your event portal awaits</div>
+    <div className="success-sub">פורטל האירועים שלך מחכה</div>
     <button className="btn" style={{ marginTop: 32 }} onClick={onReturn}>
       כניסה לאירועים
     </button>

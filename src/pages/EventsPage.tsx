@@ -4,6 +4,7 @@ import {
   getEvents,
   createEvent,
   deleteEvent,
+  updateEvent, // ← הוסיפי
   getEventTypes,
   getEventById,
 } from "../services/eventService";
@@ -42,6 +43,20 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
   const [modalError, setModalError] = useState("");
 
   const [form, setForm] = useState<EventCreateDto>({
+    eventName: "",
+    eventDate: "",
+    userID: getUserIdFromToken(),
+    eventTypeID: 0,
+    totalBudget: 0,
+    guestCount: 0,
+  });
+  // ── Edit modal state ──  ← חדש
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+  const [editModalError, setEditModalError] = useState("");
+  const [editForm, setEditForm] = useState<EventDtoo>({
+    eventID: 0,
     eventName: "",
     eventDate: "",
     userID: getUserIdFromToken(),
@@ -116,7 +131,62 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
       setSubmitting(false);
     }
   };
+  // ── Submit update ──  ← חדש
+  const handleUpdate = async () => {
+    if (!editForm.eventName?.trim()) {
+      setEditModalError("שם אירוע חובה");
+      return;
+    }
+    if (!editForm.eventDate || new Date(editForm.eventDate) <= new Date()) {
+      setEditModalError("תאריך חייב להיות בעתיד");
+      return;
+    }
+    if (editForm.totalBudget < 10000) {
+      setEditModalError("תקציב חייב להיות לפחות 10,000 ₪");
+      return;
+    }
+    if (editForm.guestCount < 30) {
+      setEditModalError("מספר אורחים חייב להיות לפחות 30");
+      return;
+    }
+    if (!editingEventId) return;
+    console.log("🔵 מתחיל UPDATE, לא DELETE!");
+    console.log("editingEventId:", editingEventId);
+    setSubmittingEdit(true);
+    setEditModalError("");
+    try {
+      const dataToSend = {
+        ...editForm,
+        eventID: editingEventId,
+        eventTypeID: Number(editForm.eventTypeID),
+      };
+      console.log("שולח לשרת:", dataToSend);
+      const updated = await updateEvent(editingEventId!, dataToSend);
+      console.log("✅ קיבלתי חזרה:", updated);
+      setEvents((prev) =>
+        prev.map((e) => (e.eventID === editingEventId ? updated : e)),
+      );
+      setShowEditModal(false);
+      // fetchEvents(); // ריענון מלא כדי להביא את כל הנתונים המעודכנים
+    } catch (err: any) {
+      setEditModalError(err.message || "שגיאה בעדכון האירוע.");
+    } finally {
+      setSubmittingEdit(false);
+    }
+  };
 
+  const openEditModal = (e: React.MouseEvent, event: EventDtoo) => {
+    e.stopPropagation(); // חשוב! מונע פתיחה של דף האירוע
+    setEditingEventId(event.eventID);
+
+    // טעינת הנתונים לתוך ה-form של העריכה
+    setEditForm({
+      ...event,
+      eventDate: event.eventDate.split("T")[0], // פורמט תקין ל-input date
+    });
+
+    setShowEditModal(true);
+  };
   // ── Delete event ──
   const handleDelete = async (id: number) => {
     if (!window.confirm("האם למחוק את האירוע?")) return;
@@ -148,9 +218,8 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
     });
   };
 
-  const getTypeName = (typeId: string) =>
-    eventTypes.find((t) => String(t.eventTypeID) === String(typeId))
-      ?.eventTypeName ?? "אירוע";
+  const getTypeName = (typeId: number) =>
+    eventTypes.find((t) => t.eventTypeID === typeId)?.eventTypeName ?? "אירוע";
 
   return (
     <>
@@ -225,14 +294,14 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                           {event.guestCount} אורחים
                         </div>
                       </div>
-                      <div className="card-footer">
+                      {/* <div className="card-footer">
                         <div>
                           <div className="card-budget">
                             ₪{event.totalBudget.toLocaleString()}
                           </div>
                           <div className="card-budget-label">תקציב כולל</div>
-                        </div>
-                        <button
+                        </div> */}
+                      {/* <button
                           className="btn-delete"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -241,7 +310,86 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                           title="מחק אירוע"
                         >
                           🗑
-                        </button>
+                        </button> */}
+                      {/* <div style={{ display: "flex", gap: "8px" }}>
+                          <button
+                            className="btn-edit"
+                            onClick={(e) =>{e.stopPropagation();
+                               openEditModal(e, event)}} // קורא לפתיחה, לא לעדכון ישיר!
+                            title="ערוך אירוע"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="btn-delete"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(event.eventID);
+                            }}
+                            title="מחק אירוע"
+                          >
+                            🗑
+                          </button>
+                        </div> */}
+
+                      <div
+                        className="card-footer"
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <div>
+                          <div className="card-budget">
+                            ₪{event.totalBudget.toLocaleString()}
+                          </div>
+                          <div className="card-budget-label">תקציב כולל</div>
+                        </div>
+
+                        {/* כאן ההפרדה הקריטית */}
+                        <div
+                          style={{ display: "flex", gap: "15px" }}
+                          onClick={(e) => e.stopPropagation()} // הגנה כפולה - מונע מהקליק "לברוח" לכרטיסייה
+                        >
+                          <button
+                            type="button"
+                            className="btn-edit"
+                            style={{
+                              cursor: "pointer",
+                              background: "none",
+                              border: "none",
+                              fontSize: "1.2rem",
+                            }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation(); // מונע פתיחה של דף האירוע
+                              openEditModal(e, event);
+                            }}
+                            title="ערוך אירוע"
+                          >
+                            ✏️
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn-delete"
+                            style={{
+                              cursor: "pointer",
+                              background: "none",
+                              border: "none",
+                              fontSize: "1.2rem",
+                            }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation(); // מונע פתיחה של דף האירוע
+                              handleDelete(event.eventID);
+                            }}
+                            title="מחק אירוע"
+                          >
+                            🗑
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -352,6 +500,140 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                   ביטול
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {/* Edit Event Modal */}
+        {showEditModal && (
+          <div
+            className="modal-overlay"
+            onClick={(e) =>
+              e.target === e.currentTarget && setShowEditModal(false)
+            }
+          >
+            <div className="modal">
+              <button
+                className="modal-close"
+                onClick={() => setShowEditModal(false)}
+              >
+                ✕
+              </button>
+              <div className="modal-title">עדכון אירוע</div>
+              <div className="modal-subtitle">
+                ערוך את פרטי האירוע "{editForm.eventName}"
+              </div>
+
+              <div className="form-group-modal">
+                <label>שם האירוע</label>
+                <input
+                  type="text"
+                  value={editForm.eventName}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, eventName: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="form-group-modal">
+                <label>תאריך</label>
+                <input
+                  type="date"
+                  value={editForm.eventDate}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, eventDate: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="form-group-modal">
+                <label>סוג אירוע</label>
+                {/* <select
+                  value={editForm.eventTypeID}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, eventTypeID: e.target.value })
+                  }
+                >
+                  {eventTypes.map((type) => (
+                    <option key={type.eventTypeID} value={type.eventTypeID}>
+                      {type.eventTypeName}
+                    </option>
+                  ))}
+                </select> */}
+                <select
+                  value={editForm.eventTypeID}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      eventTypeID: Number(e.target.value),
+                    })
+                  }
+                >
+                  {eventTypes.map((type) => (
+                    <option key={type.eventTypeID} value={type.eventTypeID}>
+                      {type.eventTypeName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="modal-grid">
+                <div className="form-group-modal">
+                  <label>תקציב (₪)</label>
+                  <input
+                    type="number"
+                    value={editForm.totalBudget}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        totalBudget: Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group-modal">
+                  <label>מספר אורחים</label>
+                  <input
+                    type="number"
+                    value={editForm.guestCount}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        guestCount: Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              {editModalError && (
+                <div className="modal-error">{editModalError}</div>
+              )}
+
+              {/* <div className="modal-actions">
+                <button
+                  className="btn-submit"
+                  onClick={handleUpdate}
+                  disabled={submittingEdit}
+                >
+                  {submittingEdit ? "מעדכן..." : "שמור שינויים"}
+                </button> */}
+              <button
+                type="button" // חשוב מאוד! מונע שליחת פורם אוטומטית
+                className="btn-submit"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleUpdate();
+                }}
+                disabled={submittingEdit}
+              >
+                {submittingEdit ? "מעדכן..." : "שמור שינויים"}
+              </button>
+              <button
+                className="btn-cancel"
+                onClick={() => setShowEditModal(false)}
+              >
+                ביטול
+              </button>
             </div>
           </div>
         )}
