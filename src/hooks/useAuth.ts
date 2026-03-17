@@ -6,7 +6,6 @@ import {
   isAuthenticated,
   type AuthResponse,
 } from "../services/authService";
-// import type { EventDtoo } from "../types/event";
 import type { UserWithID } from "../types/user";
 
 interface UseAuthReturn {
@@ -42,21 +41,19 @@ export const useAuth = (): UseAuthReturn => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
-  const saveSession = (data: AuthResponse): void => {
-    // const userInfo: UserWithID = { name: data.user?.name ?? "", email: data.user?.email ?? "", userID: data.user?.userID ?? 0, userPhone: data.user?.userPhone ?? undefined, userRole: data.user?.userRole ?? undefined };
-     const userInfo: UserWithID = {
-      userName: data?.user.userName ?? "",
-      userEmail: data?.user.userEmail ?? "",
-      userID: data?.user.userID ?? 0,
-      userPhone: data?.user.userPhone ?? undefined,
-      role: data?.user.role ?? undefined
+const saveSession = (data: AuthResponse): void => {
+    const userInfo: UserWithID = {
+      userName: data?.user?.userName ?? (data as any)?.userName ?? "",
+      userEmail: data?.user?.userEmail ?? (data as any)?.userEmail ?? "",
+      userID: data?.user?.userID ?? (data as any)?.userID ?? 0,
+      userPhone: data?.user?.userPhone ?? (data as any)?.userPhone ?? undefined,
+      role: data?.user?.role ?? (data as any)?.role ?? undefined
     };
-
-    console.log("data:", data); // Debug log for the entire response data
-    console.log("Received user data:", data); // Debug log for received user data
-    console.log("Saving session for user:", userInfo); // Debug log for user info being saved
-    console.log("Token being saved:", data.token); // Debug log for token being saved
-    localStorage.setItem("token", data.token); // שמירת הטוקן בlocalStorage
+    console.log("data:", data); 
+    console.log("Received user data:", data); 
+    console.log("Saving session for user:", userInfo); 
+    console.log("Token being saved:", data.token); 
+    localStorage.setItem("token", data.token);
     localStorage.setItem("user", JSON.stringify(userInfo));
     setUser(userInfo);
     setIsLoggedIn(true);
@@ -68,7 +65,7 @@ export const useAuth = (): UseAuthReturn => {
       setError("");
       try {
         const data = await loginUser(email, password);
-        console.log("Login response:", data); // Debug log for login response
+        console.log("Login response:", data); 
         saveSession(data);
         return true;
       } catch (err) {
