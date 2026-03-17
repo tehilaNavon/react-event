@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { globalStyles, GOLD } from "./styles/theme";
 import Logo from "./components/Logo";
@@ -60,7 +59,6 @@ const App: React.FC = () => {
     setPage("events");
     setSelectedEvent(null);
   };
-
 
   const handleVendorSelected = (
     categoryID: number,
@@ -160,7 +158,7 @@ const App: React.FC = () => {
                         WebkitTapHighlightColor: "transparent",
                       }}
                     >
-                      {t === "login" ? "Sign In" : "Register"}
+                      {t === "login" ? "התחברות" : "הרשמה"}{" "}
                     </button>
                   ))}
                 </div>
@@ -182,7 +180,7 @@ const App: React.FC = () => {
       </>
     );
   }
-//ניווט בין הדפים:
+  //ניווט בין הדפים:
   // שנה את ה-EventDetailPage render:
   if (page === "detail" && selectedEvent) {
     return (

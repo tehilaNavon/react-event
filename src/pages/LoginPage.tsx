@@ -25,7 +25,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onGoRegister }) => {
   return (
     <>
       <div className="form-group">
-        <label>Email Address</label>
+        <label>כתובת אימייל</label>
         <input
           type="email"
           placeholder="your@email.com"
@@ -37,7 +37,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onGoRegister }) => {
       </div>
 
       <div className="form-group">
-        <label>Password</label>
+        <label>סיסמה</label>
         <input
           type="password"
           placeholder="••••••••••"
@@ -51,15 +51,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onGoRegister }) => {
       {error && <div className="error-msg">{error}</div>}
 
       <button className="btn" onClick={handleLogin} disabled={loading}>
-        {loading ? "Signing in..." : "Sign In"}
+        {loading ? "מתחבר..." : "התחברות"}
       </button>
 
-      <div className="divider">or</div>
+      <div className="divider">או</div>
 
       <div className="footer-text">
-        New to Élite?{" "}
+        חדש ב-Élite?{" "}
         <span style={{ color: GOLD, cursor: "pointer" }} onClick={onGoRegister}>
-          Create an account
+          יצירת חשבון
         </span>
       </div>
     </>
