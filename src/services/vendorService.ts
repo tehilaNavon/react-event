@@ -23,3 +23,40 @@ export const saveSelectedVendors = async (eventId: number, vendorIds: number[]) 
     body: JSON.stringify(vendorIds),
   });
 };
+
+// src/services/vendorService.ts  (הוסיפי את אלה)
+
+// export async function saveSelectedVendors(
+//   eventID: number,
+//   vendorIds: number[]
+// ): Promise<void> {
+//   await fetch(`/events/${eventID}/vendors`, {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify({ vendorIds }),
+//   });
+// }
+
+// // קריאה לפרוצדורה — מוסיף משימות לספק בודד
+// export async function insertTasksForVendor(
+//   eventID: number,
+//   vendorID: number,
+//   categoryID: number
+// ): Promise<void> {
+//   await authFetch(`/tasks/generate`, {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify({ eventID, vendorID, categoryID }),
+//   });
+// }
+
+export async function insertTasksForVendor(
+  eventID: number,
+  vendorID: number,
+): Promise<void> {
+  await authFetch(`/Tasks/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ eventId: eventID, vendorId: vendorID }), // ← תואם ל-DTO
+  });
+}
