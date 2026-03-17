@@ -7,10 +7,7 @@ interface RegisterPageProps {
   onGoLogin: () => void;
 }
 
-const RegisterPage: React.FC<RegisterPageProps> = ({
-  onSuccess,
-  onGoLogin,
-}) => {
+const RegisterPage: React.FC<RegisterPageProps> = ({ onSuccess, onGoLogin }) => {
   const [name, setName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -21,11 +18,11 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
 
   const handleRegister = async () => {
     if (!name || !email || !password || !phone || !confirm) {
-      setLocalError("Please fill in all fields.");
+      setLocalError("אנא מלא את כל השדות.");
       return;
     }
     if (password !== confirm) {
-      setLocalError("Passwords do not match.");
+      setLocalError("הסיסמאות אינן תואמות.");
       return;
     }
     setLocalError("");
@@ -42,10 +39,10 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
   return (
     <>
       <div className="form-group">
-        <label>Full Name</label>
+        <label>שם מלא</label>
         <input
           type="text"
-          placeholder="Your Name"
+          placeholder="השם שלך"
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -54,7 +51,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
       </div>
 
       <div className="form-group">
-        <label>Email Address</label>
+        <label>כתובת אימייל</label>
         <input
           type="email"
           placeholder="your@email.com"
@@ -64,8 +61,9 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
           autoComplete="email"
         />
       </div>
+
       <div className="form-group">
-        <label>Phone Number</label>
+        <label>מספר טלפון</label>
         <input
           type="tel"
           placeholder="050-0000000"
@@ -74,8 +72,9 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
           autoComplete="tel"
         />
       </div>
+
       <div className="form-group">
-        <label>Password</label>
+        <label>סיסמה</label>
         <input
           type="password"
           placeholder="••••••••••"
@@ -87,7 +86,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
       </div>
 
       <div className="form-group">
-        <label>Confirm Password</label>
+        <label>אימות סיסמה</label>
         <input
           type="password"
           placeholder="••••••••••"
@@ -101,13 +100,13 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
       {displayError && <div className="error-msg">{displayError}</div>}
 
       <button className="btn" onClick={handleRegister} disabled={loading}>
-        {loading ? "Creating account..." : "Create Account"}
+        {loading ? "יוצר חשבון..." : "יצירת חשבון"}
       </button>
 
       <div className="footer-text" style={{ marginTop: 24 }}>
-        Already a member?{" "}
+        כבר רשום?{" "}
         <span style={{ color: GOLD, cursor: "pointer" }} onClick={onGoLogin}>
-          Sign in
+          התחבר
         </span>
       </div>
     </>

@@ -6,7 +6,7 @@ export interface EventDtoo {
   eventName: string;
   eventDate: string; // ISO string
   userID: number;
-  eventTypeID: string;
+  eventTypeID: number;
   totalBudget: number;
   guestCount: number;
   budgetItems ?: BudgetItem[];
