@@ -416,6 +416,7 @@ import { useState, useEffect } from "react";
 import { type categoryDtoo } from "../types/category";
 import { type EventDtoo } from "../types/event";
 import { type VendorDtoo } from "../types/vendor";
+import { getVendorsByCategory, insertTasksForVendor } from "../services/vendorService";
 import { getVendorsByCategory, saveSelectedVendors } from "../services/vendorService";
 import { pageStyles } from "../styles/VendorStyle";
 import type { BudgetItem } from "../types/budgetItem";
@@ -505,25 +506,82 @@ useEffect(() => {
     return b ? Number(b.plannedAmount) : 0;
   };
 
-  const handleProceed = async () => {
-    const vendorIds = Object.values(selected).filter((v) => v?.id > 0).map((v) => v.id);
-    await saveSelectedVendors(event.eventID, vendorIds);
-    onProceedToTasks(selected);
-  };
+  // const handleProceed = async () => {
+  //   const vendorIds = Object.values(selected)
+  //     .filter((v) => v?.id > 0)
+  //     .map((v) => v.id);
+
+  //   await saveSelectedVendors(event.eventID, vendorIds);
+  //   onProceedToTasks(selected);
+  // };
 
   const activeCategories = budgets.filter((cat) => !cat.isIgnore);
 
-  const toggleVendor = (catID: number, vendor: { id: number; name: string }, price: number) => {
-    const isDeselecting = selected[catID]?.id === vendor.id;
-    const finalPrice = catID === 3 ? price * event.guestCount : price;
-    setSelected((prev) =>
-      isDeselecting
-        ? { ...prev, [catID]: { id: 0, name: "" } }
-        : { ...prev, [catID]: vendor },
-    );
-    onVendorSelected?.(catID, isDeselecting ? 0 : finalPrice, isDeselecting ? undefined : vendor.name);
-  };
+  // const toggleVendor = (
+  //   catID: number,
+  //   vendor: { id: number; name: string },
+  //   price: number,
+  // ) => {
+  //   const isDeselecting = selected[catID]?.id === vendor.id;
 
+  //   const finalPrice = catID === 3 ? price * event.guestCount : price; // ✅ כפול אורחים רק לקטגוריה 3
+
+  //   setSelected((prev) =>
+  //     isDeselecting
+  //       ? { ...prev, [catID]: { id: 0, name: "" } }
+  //       : { ...prev, [catID]: vendor },
+  //   );
+  //   onVendorSelected?.(
+  //     catID,
+  //     isDeselecting ? 0 : finalPrice,
+  //     isDeselecting ? undefined : vendor.name,
+  //   );
+  // };
+
+  // handleProceed — שמור ספקים ואז צור משימות לכולם
+const handleProceed = async () => {
+  const vendorEntries = Object.entries(selected).filter(([, v]) => v?.id > 0);
+  const vendorIds = vendorEntries.map(([, v]) => v.id);
+
+  // 1. שמור ספקים נבחרים
+  await saveSelectedVendors(event.eventID, vendorIds);
+
+  // 2. צור משימות לכל ספק (הפרוצדורה תדלג על כפולים)
+  await Promise.all(
+    vendorEntries.map(([catID, vendor]) =>
+      insertTasksForVendor(event.eventID, vendor.id)
+    )
+  );
+
+  onProceedToTasks(selected);
+};
+
+// toggleVendor — כשנבחר ספק חדש, צור לו משימות מיד
+const toggleVendor = async (
+  catID: number,
+  vendor: { id: number; name: string },
+  price: number,
+) => {
+  const isDeselecting = selected[catID]?.id === vendor.id;
+  const finalPrice = catID === 3 ? price * event.guestCount : price;
+
+  setSelected((prev) =>
+    isDeselecting
+      ? { ...prev, [catID]: { id: 0, name: "" } }
+      : { ...prev, [catID]: vendor },
+  );
+
+  onVendorSelected?.(
+    catID,
+    isDeselecting ? 0 : finalPrice,
+    isDeselecting ? undefined : vendor.name,
+  );
+
+  // אם נבחר (לא בוטל) — צור משימות לספק הזה
+  if (!isDeselecting) {
+    await insertTasksForVendor(event.eventID, vendor.id);
+  }
+};
   const selectedCount = Object.values(selected).filter((v) => v?.id > 0).length;
 
   return (
