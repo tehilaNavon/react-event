@@ -1,4 +1,3 @@
-// src/pages/VendorsPage.tsx
 import { useState, useEffect } from "react";
 import { type categoryDtoo } from "../types/category";
 import { type EventDtoo } from "../types/event";

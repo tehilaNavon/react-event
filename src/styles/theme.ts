@@ -261,4 +261,106 @@ input:-webkit-autofill:focus {
     .card { max-width: 500px; padding: 64px 56px; }
     .logo-title { font-size: 32px; }
   }
+
+  /* ── Profile Modal ── */
+  .btn-profile {
+    padding: 12px 20px;
+    background: transparent;
+    border: 1px solid rgba(201,168,76,0.3);
+    color: ${GOLD};
+    font-family: 'Montserrat', sans-serif;
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    cursor: pointer; transition: all 0.3s;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .btn-profile:hover {
+    border-color: ${GOLD};
+    background: rgba(201,168,76,0.08);
+    transform: translateY(-1px);
+  }
+
+  .profile-modal-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px; font-weight: 300;
+    color: ${WHITE}; letter-spacing: 3px;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+
+  .profile-modal-subtitle {
+    font-size: 10px; letter-spacing: 3px;
+    color: ${GOLD}; text-transform: uppercase;
+    margin-bottom: 36px;
+  }
+
+  .profile-form-group { margin-bottom: 24px; }
+
+  .profile-form-group label {
+    display: block; font-size: 10px; letter-spacing: 3px;
+    text-transform: uppercase; color: ${GOLD};
+    margin-bottom: 10px; font-weight: 500;
+  }
+
+  .profile-form-group input {
+    width: 100%;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(201,168,76,0.2);
+    padding: 14px 18px;
+    color: ${WHITE};
+    font-family: 'Montserrat', sans-serif;
+    font-size: 14px; font-weight: 300;
+    outline: none;
+    transition: border-color 0.3s, background 0.3s;
+    -webkit-appearance: none;
+    border-radius: 0;
+    box-sizing: border-box;
+  }
+
+  .profile-form-group input:focus {
+    border-color: ${GOLD};
+    background: rgba(201,168,76,0.04);
+  }
+
+  .profile-form-group input::placeholder {
+    color: rgba(245,240,232,0.2);
+  }
+
+  .profile-btn-submit {
+    width: 100%; padding: 16px;
+    background: linear-gradient(135deg, ${GOLD_DARK}, ${GOLD}, ${GOLD_LIGHT});
+    border: none; color: ${BLACK};
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11px; letter-spacing: 4px;
+    text-transform: uppercase; font-weight: 600;
+    cursor: pointer; margin-top: 8px;
+    transition: opacity 0.3s, transform 0.2s;
+  }
+
+  .profile-btn-submit:hover { opacity: 0.9; transform: translateY(-1px); }
+  .profile-btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .profile-footer-text {
+    text-align: center; font-size: 11px;
+    color: rgba(245,240,232,0.3);
+    margin-top: 20px; letter-spacing: 1px;
+  }
+
+  .profile-error {
+    font-size: 11px; color: #e07070;
+    margin-top: 8px; letter-spacing: 1px;
+  }
+
+  .forgot-link {
+    text-align: center;
+    font-size: 11px;
+    color: rgba(201,168,76,0.6);
+    margin-top: 14px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: color 0.3s;
+  }
+
+  .forgot-link:hover {
+    color: #C9A84C;
+  }
 `;

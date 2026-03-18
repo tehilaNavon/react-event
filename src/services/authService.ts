@@ -91,3 +91,31 @@ export const authFetch = async (
     },
   });
 };
+
+export const updateUserProfile = async (id: number, name: string, email: string, phone: string): Promise<void> => {
+  const response = await authFetch(`/User/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ 
+      userID: id,
+      UserName: name, 
+      UserEmail: email, 
+      UserPhone: phone 
+    }),
+  });
+  if (!response.ok) throw new Error("עדכון נכשל");
+};
+
+
+export const resetPassword = async (email: string, phone: string, newPassword: string): Promise<void> => {
+  const response = await fetch(`${BASE_URL}/User/reset-password`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      UserEmail: email,
+      UserPhone: phone,
+      UserPasswordNew: newPassword,
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message ?? "איפוס סיסמה נכשל");
+};
