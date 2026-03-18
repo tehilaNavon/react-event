@@ -60,3 +60,15 @@ export async function insertTasksForVendor(
     body: JSON.stringify({ eventId: eventID, vendorId: vendorID }), // ← תואם ל-DTO
   });
 }
+
+export async function getBusyVendors(
+  categoryId: number,
+  eventDate: string,
+  currentEventId: number
+): Promise<number[]> {
+  const res = await authFetch(
+    `/Vendor/busy?categoryId=${categoryId}&eventDate=${eventDate}&currentEventId=${currentEventId}`
+  );
+  if (!res.ok) throw new Error("שגיאה בטעינת ספקים תפוסים");
+  return res.json();
+}
