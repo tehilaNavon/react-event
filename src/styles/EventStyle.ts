@@ -225,7 +225,15 @@ export const pageStyles = `
     align-items: center;
     justify-content: center;
   }
-
+  .modal-warning {
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid #d4af37;
+  color: #d4af37;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-top: 6px;
+}
   .btn-delete:hover {
     color: #e07070; /* צבע אדום במעבר עכבר */
     transform: scale(1.1);
@@ -403,5 +411,140 @@ export const pageStyles = `
     .events-grid { grid-template-columns: 1fr; }
     .modal { padding: 36px 24px; }
     .modal-grid { grid-template-columns: 1fr; }
+  }
+
+
+
+
+
+
+
+
+
+
+//   .modal .profile-form-group input {
+//   width: 100% !important;
+//   box-sizing: border-box !important;
+//   max-width: 100% !important;
+// }
+
+// .modal .profile-form-group label {
+//   display: block;
+//   white-space: nowrap;
+//   overflow: visible;
+// }
+
+// .modal .profile-btn-submit {
+//   width: 100% !important;
+//   background: linear-gradient(135deg, ${GOLD_DARK}, ${GOLD}, ${GOLD_LIGHT}) !important;
+//   border: none !important;
+//   color: ${BLACK} !important;
+//   font-family: 'Montserrat', sans-serif !important;
+//   font-size: 11px !important;
+//   letter-spacing: 4px !important;
+//   text-transform: uppercase !important;
+//   font-weight: 600 !important;
+//   padding: 16px !important;
+//   cursor: pointer !important;
+//   margin-top: 8px !important;
+// }
+
+
+//   .btn-profile {
+//     padding: 12px 20px;
+//     background: transparent;
+//     border: 1px solid rgba(201,168,76,0.3);
+//     color: ${GOLD};
+//     font-family: 'Montserrat', sans-serif;
+//     font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+//     cursor: pointer; transition: all 0.3s;
+//   }
+
+//   .btn-profile:hover {
+//     border-color: ${GOLD};
+//     background: rgba(201,168,76,0.08);
+//     transform: translateY(-1px);
+//   }
+
+
+css  /* ── Profile Modal ── */
+  .modal .profile-form-group {
+    margin-bottom: 20px;
+  }
+
+  .modal .profile-form-group label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: ${GOLD};
+    margin-bottom: 8px;
+    font-weight: 500;
+    text-align: right;
+  }
+
+  .modal .profile-form-group input {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid rgba(201,168,76,0.2) !important;
+    padding: 12px 16px !important;
+    color: ${WHITE} !important;
+    font-family: 'Montserrat', sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 300 !important;
+    outline: none !important;
+    border-radius: 0 !important;
+    -webkit-box-shadow: 0 0 0px 1000px #161616 inset !important;
+    -webkit-text-fill-color: ${WHITE} !important;
+      text-align: left !important;  /* ← הוסיפי רק את זה */
+
+    }
+
+  .modal .profile-form-group input:focus {
+    border-color: ${GOLD} !important;
+  }
+
+  .modal .profile-btn-submit {
+    width: 100% !important;
+    background: linear-gradient(135deg, ${GOLD_DARK}, ${GOLD}, ${GOLD_LIGHT}) !important;
+    border: none !important;
+    color: ${BLACK} !important;
+    font-family: 'Montserrat', sans-serif !important;
+    font-size: 11px !important;
+    letter-spacing: 4px !important;
+    text-transform: uppercase !important;
+    font-weight: 600 !important;
+    padding: 16px !important;
+    cursor: pointer !important;
+    margin-top: 8px !important;
+    border-radius: 0 !important;
+  }
+
+  .modal .profile-footer-text {
+    text-align: center;
+    font-size: 11px;
+    color: rgba(245,240,232,0.3);
+    margin-top: 20px;
+    letter-spacing: 1px;
+  }
+
+  .btn-profile {
+    padding: 12px 20px;
+    background: transparent;
+    border: 1px solid rgba(201,168,76,0.3);
+    color: ${GOLD};
+    font-family: 'Montserrat', sans-serif;
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    cursor: pointer; transition: all 0.3s;
+  }
+
+  .btn-profile:hover {
+    border-color: ${GOLD};
+    background: rgba(201,168,76,0.08);
+    transform: translateY(-1px);
+  }
+    .modal {
+    direction: rtl;
   }
 `;
