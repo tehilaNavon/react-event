@@ -36,7 +36,7 @@ html, body, #root {
   .vendor-card.over-budget{opacity:0.45;cursor:not-allowed;}
   @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
   .vendor-selected-badge{position:absolute;top:16px;left:16px;background:${GOLD};color:${BLACK};font-size:9px;letter-spacing:2px;padding:3px 10px;font-weight:600;}
-  .vendor-over-badge{position:absolute;top:16px;left:16px;background:rgba(224,112,112,0.15);color:#e07070;font-size:9px;letter-spacing:2px;padding:3px 10px;border:1px solid rgba(224,112,112,0.3);}
+  // .vendor-over-badge{position:absolute;top:16px;left:16px;background:rgba(224,112,112,0.15);color:#e07070;font-size:9px;letter-spacing:2px;padding:3px 10px;border:1px solid rgba(224,112,112,0.3);}
   .vendor-name{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;color:${WHITE};letter-spacing:1px;margin-bottom:8px;margin-top:8px;}
   .vendor-price{font-family:'Cormorant Garamond',serif;font-size:24px;color:${GOLD};font-weight:300;margin-bottom:4px;}
   .vendor-price-label{font-size:9px;color:${GRAY};letter-spacing:2px;margin-bottom:12px;}
@@ -57,4 +57,10 @@ html, body, #root {
   .loading-spinner{width:32px;height:32px;border:2px solid rgba(201,168,76,0.1);border-top-color:${GOLD};border-radius:50%;animation:spin 0.8s linear infinite;margin:60px auto;}
   @keyframes spin{to{transform:rotate(360deg)}}
   @media(max-width:768px){.vendors-header{padding:20px;flex-wrap:wrap;gap:16px;}.vendors-content{padding:28px 16px;}.vendors-grid{grid-template-columns:1fr;}.vendors-actions{flex-direction:column;}}
+// .vendor-card.busy{opacity:0.5;cursor:not-allowed;border-color:rgba(150,150,150,0.2)}
+// .vendor-busy-badge{position:absolute;top:12px;left:12px;font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:3px 10px;border:1px solid rgba(150,150,150,0.3);color:#aaa}
+  .vendor-card.busy{opacity:0.45;cursor:not-allowed;}
+// .vendor-busy-badge{position:absolute;top:16px;left:16px;background:rgba(255,165,0,0.15);color:#FFA500;font-size:9px;letter-spacing:2px;padding:3px 10px;border:1px solid rgba(255,165,0,0.3);}
+.vendor-over-badge{background:rgba(224,112,112,0.15);color:#e07070;font-size:9px;letter-spacing:2px;padding:3px 10px;border:1px solid rgba(224,112,112,0.3);}
+.vendor-busy-badge{background:rgba(255,165,0,0.15);color:#FFA500;font-size:9px;letter-spacing:2px;padding:3px 10px;border:1px solid rgba(255,165,0,0.3);}
 `;

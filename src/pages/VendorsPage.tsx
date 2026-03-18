@@ -2,7 +2,11 @@ import { useState, useEffect } from "react";
 import { type categoryDtoo } from "../types/category";
 import { type EventDtoo } from "../types/event";
 import { type VendorDtoo } from "../types/vendor";
-import { getVendorsByCategory, insertTasksForVendor } from "../services/vendorService";
+import {
+  getBusyVendors,
+  getVendorsByCategory,
+  insertTasksForVendor,
+} from "../services/vendorService";
 import { saveSelectedVendors } from "../services/vendorService";
 import { pageStyles } from "../styles/VendorStyle";
 import type { BudgetItem } from "../types/budgetItem";
@@ -23,7 +27,11 @@ interface Props {
   onBack: () => void;
   onProceedToTasks: (selected: Record<number, SelectedVendor>) => void;
   onSaveSelected?: (selected: Record<number, SelectedVendor>) => void;
-  onVendorSelected?: (categoryID: number, price: number, vendorName?: string) => void;
+  onVendorSelected?: (
+    categoryID: number,
+    price: number,
+    vendorName?: string,
+  ) => void;
 }
 
 const VendorsPage = ({
@@ -40,41 +48,59 @@ const VendorsPage = ({
   );
   const [vendors, setVendors] = useState<VendorDtoo[]>([]);
   const [loadingVendors, setLoadingVendors] = useState(false);
-  const [selected, setSelected] = useState<Record<number, SelectedVendor>>(initialSelected ?? {});
+  const [selected, setSelected] = useState<Record<number, SelectedVendor>>(
+    initialSelected ?? {},
+  );
   const [allCategories, setAllCategories] = useState<categoryDtoo[]>([]);
   const [hoveredVendorId, setHoveredVendorId] = useState<number | null>(null);
-  const [attributesMap, setAttributesMap] = useState<Record<number, VendorAttributeDtoo[]>>({});
+  const [attributesMap, setAttributesMap] = useState<
+    Record<number, VendorAttributeDtoo[]>
+  >({});
+  // state חדש
+const [busyVendorIds, setBusyVendorIds] = useState<number[]>([]);
+
+// בתוך useEffect של activeTab — הוסיפי בסוף:
 
   useEffect(() => {
     getCategories().then(setAllCategories).catch(console.error);
   }, []);
 
-  const getCategoryName = (categoryID: number) =>
-    allCategories.find((c) => c.categoryID === categoryID)?.categoryName ?? `קטגוריה ${categoryID}`;
-
-  // ── שליפת ספקים + תכונותיהם בלחיצה על טאב ──
+   const getCategoryName = (categoryID: number) =>
+    allCategories.find((c) => c.categoryID === categoryID)?.categoryName ??
+    `קטגוריה ${categoryID}`;
   // useEffect(() => {
   //   if (!activeTab) return;
   //   setLoadingVendors(true);
   //   getVendorsByCategory(activeTab)
-  //     .then((fetchedVendors) => {
+  //     .then(async (fetchedVendors) => {
   //       setVendors(fetchedVendors);
-  //       fetchedVendors.forEach((v) => {
-  //         if (attributesMap[v.vendorID] !== undefined) return; // כבר נטענו
-  //         getVendorAttributes(v.vendorID).then((attrs) => {
-  //           setAttributesMap((prev) => ({ ...prev, [v.vendorID]: attrs }));
-  //         });
-  //       });
+  //       const idsToFetch = fetchedVendors
+  //         .map((v) => v.vendorID)
+  //         .filter((id) => attributesMap[id] === undefined);
+  //       if (idsToFetch.length === 0) return;
+  //       const bulk = await getBulkVendorAttributes(idsToFetch);
+  //       setAttributesMap((prev) => ({ ...prev, ...bulk }));
   //     })
   //     .catch(console.error)
   //     .finally(() => setLoadingVendors(false));
+  //     getBusyVendors(activeTab, event.eventDate, event.eventID)
+  // .then(setBusyVendorIds)
+  // .catch(console.error);
+
   // }, [activeTab]);
-useEffect(() => {
+  useEffect(() => {
   if (!activeTab) return;
   setLoadingVendors(true);
-  getVendorsByCategory(activeTab)
-    .then(async (fetchedVendors) => {
+
+  // שני קריאות במקביל
+  Promise.all([
+    getVendorsByCategory(activeTab),
+    getBusyVendors(activeTab, event.eventDate, event.eventID),
+  ])
+    .then(async ([fetchedVendors, busyIds]) => {
       setVendors(fetchedVendors);
+      setBusyVendorIds(busyIds); // ← ביחד
+
       const idsToFetch = fetchedVendors
         .map((v) => v.vendorID)
         .filter((id) => attributesMap[id] === undefined);
@@ -92,82 +118,52 @@ useEffect(() => {
     return b ? Number(b.plannedAmount) : 0;
   };
 
-  // const handleProceed = async () => {
-  //   const vendorIds = Object.values(selected)
-  //     .filter((v) => v?.id > 0)
-  //     .map((v) => v.id);
-
-  //   await saveSelectedVendors(event.eventID, vendorIds);
-  //   onProceedToTasks(selected);
-  // };
-
   const activeCategories = budgets.filter((cat) => !cat.isIgnore);
 
-  // const toggleVendor = (
-  //   catID: number,
-  //   vendor: { id: number; name: string },
-  //   price: number,
-  // ) => {
-  //   const isDeselecting = selected[catID]?.id === vendor.id;
-
-  //   const finalPrice = catID === 3 ? price * event.guestCount : price; // ✅ כפול אורחים רק לקטגוריה 3
-
-  //   setSelected((prev) =>
-  //     isDeselecting
-  //       ? { ...prev, [catID]: { id: 0, name: "" } }
-  //       : { ...prev, [catID]: vendor },
-  //   );
-  //   onVendorSelected?.(
-  //     catID,
-  //     isDeselecting ? 0 : finalPrice,
-  //     isDeselecting ? undefined : vendor.name,
-  //   );
-  // };
-
   // handleProceed — שמור ספקים ואז צור משימות לכולם
-const handleProceed = async () => {
-  const vendorEntries = Object.entries(selected).filter(([, v]) => v?.id > 0);
-  const vendorIds = vendorEntries.map(([, v]) => v.id);
+  const handleProceed = async () => {
+    const vendorEntries = Object.entries(selected).filter(([, v]) => v?.id > 0);
+    const vendorIds = vendorEntries.map(([, v]) => v.id);
 
-  // 1. שמור ספקים נבחרים
-  await saveSelectedVendors(event.eventID, vendorIds);
+    // 1. שמור ספקים נבחרים
+    await saveSelectedVendors(event.eventID, vendorIds);
 
-  // 2. צור משימות לכל ספק (הפרוצדורה תדלג על כפולים)
-  await Promise.all(
-    vendorEntries.map(([catID, vendor]) =>
-      insertTasksForVendor(event.eventID, vendor.id)
-    )
-  );
+    // 2. צור משימות לכל ספק (הפרוצדורה תדלג על כפולים)
+    await Promise.all(
+      vendorEntries.map(([catID, vendor]) =>
+        insertTasksForVendor(event.eventID, vendor.id),
+      ),
+    );
 
-  onProceedToTasks(selected);
-};
+    onProceedToTasks(selected);
+  };
 
-// toggleVendor — כשנבחר ספק חדש, צור לו משימות מיד
-const toggleVendor = async (
-  catID: number,
-  vendor: { id: number; name: string },
-  price: number,
-) => {
-  const isDeselecting = selected[catID]?.id === vendor.id;
-  const finalPrice = catID === 3 ? price * event.guestCount : price;
+  // toggleVendor — כשנבחר ספק חדש, צור לו משימות מיד
+  const toggleVendor = async (
+    catID: number,
+    vendor: { id: number; name: string },
+    price: number,
+  ) => {
+    const isDeselecting = selected[catID]?.id === vendor.id;
+    const finalPrice = catID === 3 ? price * event.guestCount : price;
 
-  setSelected((prev) =>
-    isDeselecting
-      ? { ...prev, [catID]: { id: 0, name: "" } }
-      : { ...prev, [catID]: vendor },
-  );
+    setSelected((prev) =>
+      isDeselecting
+        ? { ...prev, [catID]: { id: 0, name: "" } }
+        : { ...prev, [catID]: vendor },
+    );
 
-  onVendorSelected?.(
-    catID,
-    isDeselecting ? 0 : finalPrice,
-    isDeselecting ? undefined : vendor.name,
-  );
+    onVendorSelected?.(
+      catID,
+      isDeselecting ? 0 : finalPrice,
+      isDeselecting ? undefined : vendor.name,
+    );
 
-  // אם נבחר (לא בוטל) — צור משימות לספק הזה
-  if (!isDeselecting) {
-    await insertTasksForVendor(event.eventID, vendor.id);
-  }
-};
+    // אם נבחר (לא בוטל) — צור משימות לספק הזה
+    // if (!isDeselecting) {
+    //   await insertTasksForVendor(event.eventID, vendor.id);
+    // }
+  };
   const selectedCount = Object.values(selected).filter((v) => v?.id > 0).length;
 
   return (
@@ -185,7 +181,9 @@ const toggleVendor = async (
               <div className="header-subtitle">בחירת ספקים</div>
             </div>
           </div>
-          <button className="btn-back" onClick={onBack}>← חזרה לתקציב</button>
+          <button className="btn-back" onClick={onBack}>
+            ← חזרה לתקציב
+          </button>
         </header>
 
         <main className="vendors-content">
@@ -197,7 +195,8 @@ const toggleVendor = async (
                 className={`tab ${activeTab === cat.categoryID ? "active" : ""}`}
                 onClick={() => setActiveTab(cat.categoryID)}
               >
-                {cat.allCategory?.categoryName ?? getCategoryName(cat.categoryID)}
+                {cat.allCategory?.categoryName ??
+                  getCategoryName(cat.categoryID)}
                 <div className="tab-budget">
                   ₪{Number(getCategoryBudget(cat.categoryID)).toLocaleString()}
                 </div>
@@ -217,22 +216,35 @@ const toggleVendor = async (
               ) : (
                 vendors.map((v, i) => {
                   const budget = getCategoryBudget(activeTab);
+                  
                   const isOver =
                     v.categoryID === 3
                       ? Number(v.basePrice * event.guestCount) > budget * 1.1
                       : Number(v.basePrice) > budget * 1.1;
                   const isSelected = selected[activeTab]?.id === v.vendorID;
-
+                  const isBusy = busyVendorIds.includes(v.vendorID) && !isSelected;
                   return (
                     <div
                       key={v.vendorID}
-                      className={`vendor-card ${isSelected ? "selected" : ""} ${isOver ? "over-budget" : ""}`}
-                      style={{ animationDelay: `${i * 0.08}s`, position: "relative" }}
+                      // className={`vendor-card ${isSelected ? "selected" : ""} ${isOver ? "over-budget" : ""}`}
+                      className={`vendor-card 
+  ${isSelected ? "selected" : ""} 
+  ${isOver ? "over-budget" : ""} 
+  ${isBusy ? "busy" : ""}`}
+                      style={{
+                        animationDelay: `${i * 0.08}s`,
+                        position: "relative",
+                      }}
                       onMouseEnter={() => setHoveredVendorId(v.vendorID)}
                       onMouseLeave={() => setHoveredVendorId(null)}
                       onClick={() =>
                         !isOver &&
-                        toggleVendor(activeTab, { id: v.vendorID, name: v.businessName }, Number(v.basePrice))
+                        !isBusy && 
+                        toggleVendor(
+                          activeTab,
+                          { id: v.vendorID, name: v.businessName },
+                          Number(v.basePrice),
+                        )
                       }
                     >
                       {/* Tooltip — מוצג בהובר, הנתונים כבר נטענו בלחיצה על הטאב */}
@@ -242,22 +254,45 @@ const toggleVendor = async (
                             <div className="tooltip-loading">טוען...</div>
                           ) : attributesMap[v.vendorID].length > 0 ? (
                             attributesMap[v.vendorID].map((attr) => (
-                              <div key={attr.vendorAttributeID} className="tooltip-row">
-                                <span className="tooltip-key">{attr.vendorAttributeName}</span>
-                                <span className="tooltip-val">{attr.value}</span>
+                              <div
+                                key={attr.vendorAttributeID}
+                                className="tooltip-row"
+                              >
+                                <span className="tooltip-key">
+                                  {attr.vendorAttributeName}
+                                </span>
+                                <span className="tooltip-val">
+                                  {attr.value}
+                                </span>
                               </div>
                             ))
                           ) : (
-                            <div className="tooltip-empty">אין פרטים נוספים</div>
+                            <div className="tooltip-empty">
+                              אין פרטים נוספים
+                            </div>
                           )}
                         </div>
                       )}
 
-                      {isSelected && <div className="vendor-selected-badge">✓ נבחר</div>}
-                      {isOver && !isSelected && <div className="vendor-over-badge">מעל תקציב</div>}
+                      {isSelected && (
+                        <div className="vendor-selected-badge">✓ נבחר</div>
+                      )}
+                      {/* {isOver && !isSelected && (
+                        <div className="vendor-over-badge">מעל תקציב</div>
+                      )}
+                      {isBusy && !isSelected && <div className="vendor-busy-badge">תפוס</div>} */}
+                     <div style={{ position: "absolute", top: "16px", left: "16px", display: "flex", gap: "8px" }}>
+  {isOver && !isSelected && <div className="vendor-over-badge">מעל תקציב</div>}
+  {isBusy && !isSelected && <div className="vendor-busy-badge">תפוס</div>}
+</div>
                       <div className="vendor-name">{v.businessName}</div>
                       <div className="vendor-price">
-                        ₪{Number(v.categoryID === 3 ? v.basePrice * event.guestCount : v.basePrice).toLocaleString()}
+                        ₪
+                        {Number(
+                          v.categoryID === 3
+                            ? v.basePrice * event.guestCount
+                            : v.basePrice,
+                        ).toLocaleString()}
                       </div>
                       <div className="vendor-price-label">מחיר בסיס</div>
                     </div>
@@ -269,13 +304,16 @@ const toggleVendor = async (
 
           {selectedCount > 0 && (
             <div className="selected-summary">
-              <div className="summary-title">ספקים שנבחרו ({selectedCount})</div>
+              <div className="summary-title">
+                ספקים שנבחרו ({selectedCount})
+              </div>
               <div className="summary-list">
                 {budgets.map((cat) => {
                   const v = selected[cat.categoryID];
                   return v?.id > 0 ? (
                     <div key={cat.categoryID} className="summary-chip">
-                      {cat.allCategory?.categoryName}: {v.name}
+                      {/* {cat.allCategory?.categoryName}  */}
+                      {v.name}
                     </div>
                   ) : null;
                 })}
@@ -286,14 +324,24 @@ const toggleVendor = async (
           <div className="vendors-actions">
             <button
               className="btn-secondary"
-              onClick={() => {
+              onClick={async () => {
+                const vendorIds = Object.values(selected)
+                  .filter((v) => v?.id > 0)
+                  .map((v) => v.id);
+console.log("Saving selected vendors for event", event.eventID, ":", vendorIds);
+                await saveSelectedVendors(event.eventID, vendorIds); // ← שמור ספקים
+
                 onSaveSelected?.(selected);
                 onBack();
               }}
             >
               ← חזרה
             </button>
-            <button className="btn-primary" disabled={selectedCount === 0} onClick={handleProceed}>
+            <button
+              className="btn-primary"
+              disabled={selectedCount === 0}
+              onClick={handleProceed}
+            >
               המשך למשימות ←
             </button>
           </div>
@@ -304,10 +352,3 @@ const toggleVendor = async (
 };
 
 export default VendorsPage;
-
-
-
-
-
-
-
