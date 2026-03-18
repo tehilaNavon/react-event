@@ -15,6 +15,7 @@ import {
 } from "../types/event";
 import { getToken } from "../services/authService";
 import { pageStyles } from "../styles/EventStyle";
+import RegisterPage from "./RegisterPage";
 
 // ── decode userID from token ──────────────────────────────
 const getUserIdFromToken = (): number => {
@@ -41,6 +42,7 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState("");
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const [form, setForm] = useState<EventCreateDto>({
     eventName: "",
@@ -55,6 +57,8 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [submittingEdit, setSubmittingEdit] = useState(false);
   const [editModalError, setEditModalError] = useState("");
+  const [showBudgetWarning, setShowBudgetWarning] = useState(false);
+  const [showDateWarning, setShowDateWarning] = useState(false);
   const [editForm, setEditForm] = useState<EventDtoo>({
     eventID: 0,
     eventName: "",
@@ -150,8 +154,6 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
       return;
     }
     if (!editingEventId) return;
-    console.log("🔵 מתחיל UPDATE, לא DELETE!");
-    console.log("editingEventId:", editingEventId);
     setSubmittingEdit(true);
     setEditModalError("");
     try {
@@ -160,13 +162,11 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
         eventID: editingEventId,
         eventTypeID: Number(editForm.eventTypeID),
       };
-      console.log("שולח לשרת:", dataToSend);
       const updated = await updateEvent(editingEventId!, dataToSend);
-      console.log("✅ קיבלתי חזרה:", updated);
       setEvents((prev) =>
         prev.map((e) => (e.eventID === editingEventId ? updated : e)),
       );
-      setShowEditModal(false);
+      closeEditModal();
       // fetchEvents(); // ריענון מלא כדי להביא את כל הנתונים המעודכנים
     } catch (err: any) {
       setEditModalError(err.message || "שגיאה בעדכון האירוע.");
@@ -174,7 +174,20 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
       setSubmittingEdit(false);
     }
   };
-
+  const getUserData = () => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (!stored) return { name: "", email: "", phone: "" };
+      const u = JSON.parse(stored);
+      return {
+        name: u.userName ?? "",
+        email: u.userEmail ?? "",
+        phone: u.userPhone ?? "",
+      };
+    } catch {
+      return { name: "", email: "", phone: "" };
+    }
+  };
   const openEditModal = (e: React.MouseEvent, event: EventDtoo) => {
     e.stopPropagation(); // חשוב! מונע פתיחה של דף האירוע
     setEditingEventId(event.eventID);
@@ -186,6 +199,12 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
     });
 
     setShowEditModal(true);
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setShowBudgetWarning(false);
+    setShowDateWarning(false);
   };
   // ── Delete event ──
   const handleDelete = async (id: number) => {
@@ -238,9 +257,16 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
               <div className="header-subtitle">ניהול אירועים</div>
             </div>
           </div>
+
           <div className="header-actions">
             <button className="btn-add" onClick={() => setShowModal(true)}>
               + אירוע חדש
+            </button>
+            <button
+              className="btn-profile"
+              onClick={() => setShowProfileModal(true)}
+            >
+              👤 פרטים אישיים
             </button>
             <button className="btn-logout" onClick={onLogout}>
               יציאה
@@ -294,44 +320,6 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                           {event.guestCount} אורחים
                         </div>
                       </div>
-                      {/* <div className="card-footer">
-                        <div>
-                          <div className="card-budget">
-                            ₪{event.totalBudget.toLocaleString()}
-                          </div>
-                          <div className="card-budget-label">תקציב כולל</div>
-                        </div> */}
-                      {/* <button
-                          className="btn-delete"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(event.eventID);
-                          }}
-                          title="מחק אירוע"
-                        >
-                          🗑
-                        </button> */}
-                      {/* <div style={{ display: "flex", gap: "8px" }}>
-                          <button
-                            className="btn-edit"
-                            onClick={(e) =>{e.stopPropagation();
-                               openEditModal(e, event)}} // קורא לפתיחה, לא לעדכון ישיר!
-                            title="ערוך אירוע"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            className="btn-delete"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(event.eventID);
-                            }}
-                            title="מחק אירוע"
-                          >
-                            🗑
-                          </button>
-                        </div> */}
-
                       <div
                         className="card-footer"
                         style={{
@@ -507,15 +495,10 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
         {showEditModal && (
           <div
             className="modal-overlay"
-            onClick={(e) =>
-              e.target === e.currentTarget && setShowEditModal(false)
-            }
+            onClick={(e) => e.target === e.currentTarget && closeEditModal()}
           >
             <div className="modal">
-              <button
-                className="modal-close"
-                onClick={() => setShowEditModal(false)}
-              >
+              <button className="modal-close" onClick={() => closeEditModal()}>
                 ✕
               </button>
               <div className="modal-title">עדכון אירוע</div>
@@ -539,10 +522,22 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                 <input
                   type="date"
                   value={editForm.eventDate}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, eventDate: e.target.value })
-                  }
+                  // onChange={(e) =>
+                  //   setEditForm({ ...editForm, eventDate: e.target.value })
+                  // }
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    if (newDate !== editForm.eventDate)
+                      setShowDateWarning(true);
+                    else setShowDateWarning(false);
+                    setEditForm({ ...editForm, eventDate: newDate });
+                  }}
                 />
+                {showDateWarning && (
+                  <div className="modal-warning">
+                    ⚠️ שינוי תאריך יגרום למחיקת כל הספקים שנבחרו
+                  </div>
+                )}
               </div>
 
               <div className="form-group-modal">
@@ -582,13 +577,25 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
                   <input
                     type="number"
                     value={editForm.totalBudget}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        totalBudget: Number(e.target.value),
-                      })
-                    }
+                    // onChange={(e) =>
+                    //   setEditForm({
+                    //     ...editForm,
+                    //     totalBudget: Number(e.target.value),
+                    //   })
+                    // }
+                    onChange={(e) => {
+                      const newBudget = Number(e.target.value);
+                      if (newBudget !== editForm.totalBudget)
+                        setShowBudgetWarning(true);
+                      else setShowBudgetWarning(false);
+                      setEditForm({ ...editForm, totalBudget: newBudget });
+                    }}
                   />
+                  {showBudgetWarning && (
+                    <div className="modal-warning">
+                      ⚠️ שינוי תקציב יגרום למחיקת כל הספקים וחלוקת תקציב מחדש
+                    </div>
+                  )}
                 </div>
                 <div className="form-group-modal">
                   <label>מספר אורחים</label>
@@ -608,32 +615,52 @@ const EventsPage = ({ onLogout, onSelectEvent }: EventsPageProps) => {
               {editModalError && (
                 <div className="modal-error">{editModalError}</div>
               )}
-
-              {/* <div className="modal-actions">
-                <button
-                  className="btn-submit"
-                  onClick={handleUpdate}
-                  disabled={submittingEdit}
-                >
-                  {submittingEdit ? "מעדכן..." : "שמור שינויים"}
-                </button> */}
               <button
-                type="button" // חשוב מאוד! מונע שליחת פורם אוטומטית
+                type="button" 
                 className="btn-submit"
                 onClick={(e) => {
                   e.preventDefault();
+                  if (showBudgetWarning || showDateWarning) {
+                    const msg = showBudgetWarning
+                      ? "שינוי תקציב ימחק את כל הספקים שנבחרו ויבצע חלוקת תקציב מחדש. להמשיך?"
+                      : "שינוי תאריך ימחק את כל הספקים שנבחרו. להמשיך?";
+                    if (!window.confirm(msg)) return;
+                  }
                   handleUpdate();
                 }}
                 disabled={submittingEdit}
               >
                 {submittingEdit ? "מעדכן..." : "שמור שינויים"}
               </button>
-              <button
-                className="btn-cancel"
-                onClick={() => setShowEditModal(false)}
-              >
+              <button className="btn-cancel" onClick={() => closeEditModal()}>
                 ביטול
               </button>
+            </div>
+          </div>
+        )}
+
+        {showProfileModal && (
+          <div
+            className="modal-overlay"
+            onClick={(e) =>
+              e.target === e.currentTarget && setShowProfileModal(false)
+            }
+          >
+            <div className="modal">
+              <button
+                className="modal-close"
+                onClick={() => setShowProfileModal(false)}
+              >
+                ✕
+              </button>
+              <div className="modal-title">עדכון פרטים אישיים</div>
+              <RegisterPage
+                editMode={true}
+                initialData={getUserData()}
+                onSuccess={() => setShowProfileModal(false)}
+                onGoLogin={() => {}}
+                onCancel={() => setShowProfileModal(false)}
+              />
             </div>
           </div>
         )}
