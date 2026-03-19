@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAppContext } from "../App";
+import { useDispatch } from "react-redux";
+import type { AppDispatch } from "../store/store";
+import { setLoggedIn } from "../store/appSlice";
 import { globalStyles, GOLD } from "../styles/theme";
 import Logo from "../components/Logo";
 import SuccessScreen from "../components/SuccessScreen";
@@ -15,30 +17,23 @@ interface SuccessState {
 }
 
 interface AuthPageProps {
-  tab?: Tab; // איזה טאב להציג ראשון — login או register
+  tab?: Tab;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AuthPage
-// מעטפת שמחברת בין LoginPage ל-RegisterPage.
-// הם כבר היו קיימים — AuthPage רק מוסיף את ה-UI של הטאבים
-// ואת הניווט ל-/events אחרי הצלחה.
-// ─────────────────────────────────────────────────────────────────────────────
 const AuthPage: React.FC<AuthPageProps> = ({ tab: initialTab = "login" }) => {
   const navigate = useNavigate();
-  const { setLoggedIn } = useAppContext();
+  const dispatch = useDispatch<AppDispatch>();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [success, setSuccess] = useState<SuccessState | null>(null);
 
   const handleReturn = () => {
     setSuccess(null);
-    setLoggedIn(true);
+    dispatch(setLoggedIn(true));
     navigate("/events");
   };
 
   const switchTab = (t: Tab) => {
     setTab(t);
-    // מעדכן גם את ה-URL
     navigate(t === "login" ? "/auth" : "/auth/register", { replace: true });
   };
 
@@ -90,10 +85,9 @@ const AuthPage: React.FC<AuthPageProps> = ({ tab: initialTab = "login" }) => {
                   </button>
                 ))}
               </div>
-
               {tab === "login" ? (
                 <LoginPage
-                  onSuccess={(name) => setSuccess({ mode: "login", name })}
+                  onSuccess={(email) => setSuccess({ mode: "login", name: email })}
                   onGoRegister={() => switchTab("register")}
                 />
               ) : (

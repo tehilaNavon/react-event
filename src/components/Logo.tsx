@@ -1,5 +1,4 @@
 import React from "react";
-import { GOLD } from "../styles/theme";
 
 const Logo: React.FC = () => (
   <div className="logo">

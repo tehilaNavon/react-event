@@ -1,24 +1,28 @@
 import React, { useState, useEffect } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { useAppContext } from "../App";
+import { useSelector, useDispatch } from "react-redux";
+import type { RootState, AppDispatch } from "../store/store";
+import {
+  setSelectedEvent,
+  setSavedBudgets,
+  setSelectedVendors,
+  setBudgets,
+  vendorSelected,
+  logout,
+} from "../store/appSlice";
 import EventsPage from "../pages/EventsPage";
 import EventDetailPage from "../pages/BudgetItemsPage";
 import VendorsPage from "../pages/VendorsPage";
 import TasksPage from "../pages/TasksPage";
 import type { CategoryBudget } from "../types/budgetItem";
 import { getEventById } from "../services/eventService";
+import { logoutUser } from "../services/authService";
 import type { EventDtoo } from "../types/event";
-
-interface SelectedVendor {
-  id: number;
-  name: string;
-}
+import type { SelectedVendor } from "../types/app";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // buildStateFromEvent
-// מקבלת אירוע מהשרת ובונה את ה-State הדרוש לכל העמודים:
-// savedSelected — מילון { categoryID → ספק נבחר }
-// initial       — מערך CategoryBudget לכל קטגוריה
+// בונה את ה-State הדרוש מתוך אירוע שחזר מהשרת
 // ─────────────────────────────────────────────────────────────────────────────
 export const buildStateFromEvent = (event: EventDtoo) => {
   const savedSelected: Record<number, SelectedVendor> = {};
@@ -55,50 +59,58 @@ export const buildStateFromEvent = (event: EventDtoo) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // useLoadEvent
-// Custom hook משותף לכל ה-wrappers שצריכים לטעון אירוע מהשרת בעת רענון
+// Custom hook — טוען אירוע מהשרת אם ה-State ריק (רענון דף)
 // ─────────────────────────────────────────────────────────────────────────────
 const useLoadEvent = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
   const { eventId } = useParams<{ eventId: string }>();
-  const { selectedEvent, setSelectedEvent, setSavedBudgets, setSelectedVendors } = useAppContext();
-  const [loading, setLoading] = useState(!selectedEvent);
+  const selectedEvent = useSelector((state: RootState) => state.app.selectedEvent);
+ const isCorrectEvent = selectedEvent?.eventID === Number(eventId);
+  const [loading, setLoading] = useState(!isCorrectEvent);
 
   useEffect(() => {
-    if (selectedEvent) return;
+    if (isCorrectEvent) return;
     if (!eventId) { navigate("/events"); return; }
 
     getEventById(Number(eventId))
       .then((event) => {
         const { savedSelected, initial } = buildStateFromEvent(event);
-        setSelectedEvent(event);
-        setSelectedVendors(savedSelected);
-        setSavedBudgets(initial);
+        dispatch(setSelectedEvent(event));
+        dispatch(setSelectedVendors(savedSelected));
+        dispatch(setSavedBudgets(initial));
       })
       .catch(() => navigate("/events"))
       .finally(() => setLoading(false));
   }, [eventId]);
 
-  return { loading, selectedEvent };
+  // return { loading, selectedEvent };
+  return { loading, selectedEvent: isCorrectEvent ? selectedEvent : null };
+
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Wrappers
-// כל wrapper מתרגם בין עולם הראוטר (useNavigate, useParams)
-// לבין ה-props שהדפים המקוריים מצפים לקבל
+// מתרגמים בין עולם הראוטר לבין ה-props שהדפים מצפים לקבל
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const EventsPageWrapper: React.FC = () => {
   const navigate = useNavigate();
-  const { setSelectedEvent, setSavedBudgets, setSelectedVendors, handleLogout } = useAppContext();
+  const dispatch = useDispatch<AppDispatch>();
+
+  const handleLogout = () => {
+    logoutUser();
+    dispatch(logout());
+  };
 
   return (
     <EventsPage
       onLogout={handleLogout}
       onSelectEvent={(event) => {
         const { savedSelected, initial } = buildStateFromEvent(event);
-        setSelectedEvent(event);
-        setSelectedVendors(savedSelected);
-        setSavedBudgets(initial);
+        dispatch(setSelectedEvent(event));
+        dispatch(setSelectedVendors(savedSelected));
+        dispatch(setSavedBudgets(initial));
         navigate(`/events/${event.eventID}`);
       }}
     />
@@ -107,8 +119,9 @@ export const EventsPageWrapper: React.FC = () => {
 
 export const EventDetailPageWrapper: React.FC = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
   const { loading, selectedEvent } = useLoadEvent();
-  const { savedBudgets, setSavedBudgets, setBudgets, setSelectedEvent } = useAppContext();
+  const savedBudgets = useSelector((state: RootState) => state.app.savedBudgets);
 
   if (loading) return null;
   if (!selectedEvent) return <Navigate to="/events" replace />;
@@ -119,21 +132,18 @@ export const EventDetailPageWrapper: React.FC = () => {
       initialBudgets={savedBudgets}
       onBack={() => navigate("/events")}
       onProceedToVendors={(b) => {
-        setBudgets(b);
+        dispatch(setBudgets(b));
         navigate(`/events/${selectedEvent.eventID}/vendors`);
       }}
       onEventUpdate={(updatedBudgets) => {
-        setSavedBudgets(updatedBudgets);
-        setSelectedEvent((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            budgetItems: prev.budgetItems?.map((item) => {
-              const updated = updatedBudgets.find((b) => b.categoryID === item.categoryID);
-              return updated ? { ...item, plannedAmount: updated.currentAmount } : item;
-            }),
-          };
-        });
+        dispatch(setSavedBudgets(updatedBudgets));
+        dispatch(setSelectedEvent({
+          ...selectedEvent,
+          budgetItems: selectedEvent.budgetItems?.map((item) => {
+            const updated = updatedBudgets.find((b) => b.categoryID === item.categoryID);
+            return updated ? { ...item, plannedAmount: updated.currentAmount } : item;
+          }),
+        }));
       }}
     />
   );
@@ -141,8 +151,10 @@ export const EventDetailPageWrapper: React.FC = () => {
 
 export const VendorsPageWrapper: React.FC = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
   const { loading, selectedEvent } = useLoadEvent();
-  const { budgets, selectedVendors, setSelectedVendors, handleVendorSelected } = useAppContext();
+  const budgets = useSelector((state: RootState) => state.app.budgets);
+  const selectedVendors = useSelector((state: RootState) => state.app.selectedVendors);
 
   if (loading) return null;
   if (!selectedEvent) return <Navigate to="/events" replace />;
@@ -156,11 +168,13 @@ export const VendorsPageWrapper: React.FC = () => {
       event={selectedEvent}
       budgets={activeBudgets}
       initialSelected={selectedVendors}
-      onSaveSelected={(v) => setSelectedVendors(v)}
+      onSaveSelected={(v) => dispatch(setSelectedVendors(v))}
       onBack={() => navigate(`/events/${selectedEvent.eventID}`)}
-      onVendorSelected={handleVendorSelected}
+      onVendorSelected={(categoryID, price, vendorName) =>
+        dispatch(vendorSelected({ categoryID, price, vendorName, totalBudget: selectedEvent.totalBudget }))
+      }
       onProceedToTasks={(v) => {
-        setSelectedVendors(v);
+        dispatch(setSelectedVendors(v));
         navigate(`/events/${selectedEvent.eventID}/tasks`);
       }}
     />
@@ -169,8 +183,9 @@ export const VendorsPageWrapper: React.FC = () => {
 
 export const TasksPageWrapper: React.FC = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
   const { loading, selectedEvent } = useLoadEvent();
-  const { selectedVendors, setSelectedEvent } = useAppContext();
+  const selectedVendors = useSelector((state: RootState) => state.app.selectedVendors);
 
   if (loading) return null;
   if (!selectedEvent) return <Navigate to="/events" replace />;
@@ -181,7 +196,7 @@ export const TasksPageWrapper: React.FC = () => {
       selectedVendors={selectedVendors}
       onBack={() => navigate(`/events/${selectedEvent.eventID}/vendors`)}
       onFinish={() => {
-        setSelectedEvent(null);
+        dispatch(setSelectedEvent(null));
         navigate("/events");
       }}
     />
