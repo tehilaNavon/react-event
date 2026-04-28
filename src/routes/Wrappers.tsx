@@ -14,7 +14,7 @@ import EventsPage from "../pages/EventsPage";
 import EventDetailPage from "../pages/BudgetItemsPage";
 import VendorsPage from "../pages/VendorsPage";
 import TasksPage from "../pages/TasksPage";
-import type { CategoryBudget } from "../types/budgetItem";
+import type { BudgetItem, CategoryBudget } from "../types/budgetItem";
 import { getEventById } from "../services/eventService";
 import { logoutUser } from "../services/authService";
 import type { EventDtoo } from "../types/event";
@@ -32,7 +32,9 @@ export const buildStateFromEvent = (event: EventDtoo) => {
 
   const initial: CategoryBudget[] = (event.budgetItems ?? []).map((item) => {
     const savedVendor = savedSelected[item.categoryID];
-    const vendorData = event.vendors?.find((v) => v.categoryID === item.categoryID);
+    const vendorData = event.vendors?.find(
+      (v) => v.categoryID === item.categoryID,
+    );
     const vendorPrice = vendorData
       ? item.categoryID === 3
         ? vendorData.basePrice * event.guestCount
@@ -40,7 +42,8 @@ export const buildStateFromEvent = (event: EventDtoo) => {
       : item.plannedAmount;
     return {
       categoryID: item.categoryID,
-      categoryName: item.allCategory?.categoryName ?? `קטגוריה ${item.categoryID}`,
+      categoryName:
+        item.allCategory?.categoryName ?? `קטגוריה ${item.categoryID}`,
       plannedAmount: item.plannedAmount,
       currentAmount: savedVendor ? vendorPrice : item.plannedAmount,
       minLoading: !savedVendor,
@@ -65,13 +68,18 @@ const useLoadEvent = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const { eventId } = useParams<{ eventId: string }>();
-  const selectedEvent = useSelector((state: RootState) => state.app.selectedEvent);
- const isCorrectEvent = selectedEvent?.eventID === Number(eventId);
+  const selectedEvent = useSelector(
+    (state: RootState) => state.app.selectedEvent,
+  );
+  const isCorrectEvent = selectedEvent?.eventID === Number(eventId);
   const [loading, setLoading] = useState(!isCorrectEvent);
 
   useEffect(() => {
     if (isCorrectEvent) return;
-    if (!eventId) { navigate("/events"); return; }
+    if (!eventId) {
+      navigate("/events");
+      return;
+    }
 
     getEventById(Number(eventId))
       .then((event) => {
@@ -86,7 +94,6 @@ const useLoadEvent = () => {
 
   // return { loading, selectedEvent };
   return { loading, selectedEvent: isCorrectEvent ? selectedEvent : null };
-
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -121,7 +128,9 @@ export const EventDetailPageWrapper: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const { loading, selectedEvent } = useLoadEvent();
-  const savedBudgets = useSelector((state: RootState) => state.app.savedBudgets);
+  const savedBudgets = useSelector(
+    (state: RootState) => state.app.savedBudgets,
+  );
 
   if (loading) return null;
   if (!selectedEvent) return <Navigate to="/events" replace />;
@@ -132,18 +141,51 @@ export const EventDetailPageWrapper: React.FC = () => {
       initialBudgets={savedBudgets}
       onBack={() => navigate("/events")}
       onProceedToVendors={(b) => {
-        dispatch(setBudgets(b));
+        const formattedBudgets: BudgetItem[] = b.map((item) => {
+          // מוצאים את הפריט המקורי כדי לשמור על ה-ID שלו
+          const originalItem = selectedEvent.budgetItems?.find(
+            (oi) => oi.categoryID === item.categoryID,
+          );
+
+          return {
+            // שדות שקיימים ב-CategoryBudget וצריך למפות:
+            categoryID: item.categoryID,
+            plannedAmount: item.plannedAmount,
+            actualAmount: item.currentAmount, // מיפוי שם שונה
+            isLocked: item.locked, // מיפוי שם שונה
+            isIgnore: item.ignored, // מיפוי שם שונה
+
+            // שדות שחסרים ב-CategoryBudget וחייבים להגיע מה-Event או מהמקור:
+            budgetItemID: originalItem?.budgetItemID ?? 0,
+            eventID: selectedEvent.eventID,
+            vendorID: originalItem?.vendorID ?? 0,
+
+            // אופציונלי: שמירה על אובייקט הקטגוריה אם הוא קיים
+            allCategory: originalItem?.allCategory,
+          };
+        });
+        dispatch(setBudgets(formattedBudgets));
         navigate(`/events/${selectedEvent.eventID}/vendors`);
       }}
+      // onProceedToVendors={(b) => {
+      //   dispatch(setBudgets(b));
+      //   navigate(`/events/${selectedEvent.eventID}/vendors`);
+      // }}
       onEventUpdate={(updatedBudgets) => {
         dispatch(setSavedBudgets(updatedBudgets));
-        dispatch(setSelectedEvent({
-          ...selectedEvent,
-          budgetItems: selectedEvent.budgetItems?.map((item) => {
-            const updated = updatedBudgets.find((b) => b.categoryID === item.categoryID);
-            return updated ? { ...item, plannedAmount: updated.currentAmount } : item;
+        dispatch(
+          setSelectedEvent({
+            ...selectedEvent,
+            budgetItems: selectedEvent.budgetItems?.map((item) => {
+              const updated = updatedBudgets.find(
+                (b) => b.categoryID === item.categoryID,
+              );
+              return updated
+                ? { ...item, plannedAmount: updated.currentAmount }
+                : item;
+            }),
           }),
-        }));
+        );
       }}
     />
   );
@@ -154,14 +196,17 @@ export const VendorsPageWrapper: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { loading, selectedEvent } = useLoadEvent();
   const budgets = useSelector((state: RootState) => state.app.budgets);
-  const selectedVendors = useSelector((state: RootState) => state.app.selectedVendors);
+  const selectedVendors = useSelector(
+    (state: RootState) => state.app.selectedVendors,
+  );
 
   if (loading) return null;
   if (!selectedEvent) return <Navigate to="/events" replace />;
 
-  const activeBudgets = budgets.length > 0
-    ? budgets
-    : (selectedEvent.budgetItems ?? []).filter((b) => !b.isIgnore);
+  const activeBudgets =
+    budgets.length > 0
+      ? budgets
+      : (selectedEvent.budgetItems ?? []).filter((b) => !b.isIgnore);
 
   return (
     <VendorsPage
@@ -171,7 +216,14 @@ export const VendorsPageWrapper: React.FC = () => {
       onSaveSelected={(v) => dispatch(setSelectedVendors(v))}
       onBack={() => navigate(`/events/${selectedEvent.eventID}`)}
       onVendorSelected={(categoryID, price, vendorName) =>
-        dispatch(vendorSelected({ categoryID, price, vendorName, totalBudget: selectedEvent.totalBudget }))
+        dispatch(
+          vendorSelected({
+            categoryID,
+            price,
+            vendorName,
+            totalBudget: selectedEvent.totalBudget,
+          }),
+        )
       }
       onProceedToTasks={(v) => {
         dispatch(setSelectedVendors(v));
@@ -185,7 +237,9 @@ export const TasksPageWrapper: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const { loading, selectedEvent } = useLoadEvent();
-  const selectedVendors = useSelector((state: RootState) => state.app.selectedVendors);
+  const selectedVendors = useSelector(
+    (state: RootState) => state.app.selectedVendors,
+  );
 
   if (loading) return null;
   if (!selectedEvent) return <Navigate to="/events" replace />;
